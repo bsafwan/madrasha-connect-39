@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import DataCard from "@/components/DataCard";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Area,
   AreaChart,
