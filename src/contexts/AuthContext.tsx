@@ -1,24 +1,8 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User, UserRole } from "@/types";
-
-// Mock user data
-const MOCK_USERS: User[] = [
-  {
-    id: "1",
-    name: "আদমিন ইউজার",
-    email: "admin@example.com",
-    phone: "01711111111",
-    role: "admin",
-  },
-  {
-    id: "2",
-    name: "শিক্ষক ইউজার",
-    email: "teacher@example.com",
-    phone: "01722222222",
-    role: "teacher",
-  }
-];
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/use-toast";
 
 interface AuthContextType {
   user: User | null;
@@ -46,25 +30,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // This is a mock authentication - in a real app, you'd call an API
-    const foundUser = MOCK_USERS.find(u => u.email === email);
-    
-    if (foundUser) {
-      localStorage.setItem("user", JSON.stringify(foundUser));
-      setUser(foundUser);
-    } else {
-      throw new Error("ইমেইল বা পাসওয়ার্ড ভুল");
+    try {
+      // Query the users table for the given email and password
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .eq('password', password)
+        .maybeSingle();
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      if (!data) {
+        throw new Error("ইমেইল বা পাসওয়ার্ড ভুল");
+      }
+      
+      // Format user data and save to state/localStorage
+      const userData: User = {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        role: data.role as UserRole,
+      };
+      
+      localStorage.setItem("user", JSON.stringify(userData));
+      setUser(userData);
+      toast({
+        title: "সফল লগইন",
+        description: `স্বাগতম, ${userData.name}!`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "লগইন ব্যর্থ",
+        description: error.message,
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   const logout = () => {
     localStorage.removeItem("user");
     setUser(null);
+    toast({
+      title: "লগআউট সফল",
+      description: "আপনি সফলভাবে লগআউট হয়েছেন।",
+    });
   };
 
   const isAllowed = (roles: UserRole[]) => {

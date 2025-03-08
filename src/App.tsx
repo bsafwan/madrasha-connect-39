@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 import Layout from "./components/Layout";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -29,7 +30,7 @@ const App = () => (
               <Route path="/groups" element={<div className="py-10 text-center">গ্রুপ ব্যবস্থাপনা পেজ (বিকাশাধীন)</div>} />
               <Route path="/notifications" element={<div className="py-10 text-center">নোটিফিকেশন পেজ (বিকাশাধীন)</div>} />
               <Route path="/users" element={<div className="py-10 text-center">ইউজার ব্যবস্থাপনা পেজ (বিকাশাধীন)</div>} />
-              <Route path="/settings" element={<div className="py-10 text-center">সেটিংস পেজ (বিকাশাধীন)</div>} />
+              <Route path="/settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

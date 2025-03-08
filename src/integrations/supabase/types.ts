@@ -9,7 +9,340 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      exam_results: {
+        Row: {
+          created_at: string
+          exam_id: string
+          id: string
+          remarks: string | null
+          scores: Json
+          student_id: string
+          total: number
+        }
+        Insert: {
+          created_at?: string
+          exam_id: string
+          id?: string
+          remarks?: string | null
+          scores: Json
+          student_id: string
+          total: number
+        }
+        Update: {
+          created_at?: string
+          exam_id?: string
+          id?: string
+          remarks?: string | null
+          scores?: Json
+          student_id?: string
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_results_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "exams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exam_results_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exams: {
+        Row: {
+          created_at: string
+          date: string
+          group_name: string
+          id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          group_name: string
+          id?: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          group_name?: string
+          id?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      expenses: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          created_by: string
+          date: string
+          description: string | null
+          id: string
+          status: string
+          subcategory: string
+          title: string
+          verified_by: string | null
+        }
+        Insert: {
+          amount: number
+          category: string
+          created_at?: string
+          created_by: string
+          date?: string
+          description?: string | null
+          id?: string
+          status: string
+          subcategory: string
+          title: string
+          verified_by?: string | null
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          created_by?: string
+          date?: string
+          description?: string | null
+          id?: string
+          status?: string
+          subcategory?: string
+          title?: string
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          accepted_by: string
+          amount: number
+          created_at: string
+          date: string
+          description: string | null
+          id: string
+          status: string
+          student_id: string
+          type: string
+          verified_by: string | null
+        }
+        Insert: {
+          accepted_by: string
+          amount: number
+          created_at?: string
+          date?: string
+          description?: string | null
+          id?: string
+          status: string
+          student_id: string
+          type: string
+          verified_by?: string | null
+        }
+        Update: {
+          accepted_by?: string
+          amount?: number
+          created_at?: string
+          date?: string
+          description?: string | null
+          id?: string
+          status?: string
+          student_id?: string
+          type?: string
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_accepted_by_fkey"
+            columns: ["accepted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quran_progress: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          progress: string
+          student_id: string
+          type: string
+          verified_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          id?: string
+          progress: string
+          student_id: string
+          type: string
+          verified_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          progress?: string
+          student_id?: string
+          type?: string
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quran_progress_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quran_progress_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      students: {
+        Row: {
+          active: boolean
+          address: string
+          father_name: string
+          group_name: string
+          id: string
+          monthly_fee: number
+          mother_name: string
+          name: string
+          registration_date: string
+          whatsapp_number: string
+        }
+        Insert: {
+          active?: boolean
+          address: string
+          father_name: string
+          group_name: string
+          id?: string
+          monthly_fee: number
+          mother_name: string
+          name: string
+          registration_date?: string
+          whatsapp_number: string
+        }
+        Update: {
+          active?: boolean
+          address?: string
+          father_name?: string
+          group_name?: string
+          id?: string
+          monthly_fee?: number
+          mother_name?: string
+          name?: string
+          registration_date?: string
+          whatsapp_number?: string
+        }
+        Relationships: []
+      }
+      users: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+          password: string
+          phone: string
+          role: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          password: string
+          phone: string
+          role: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          password?: string
+          phone?: string
+          role?: string
+        }
+        Relationships: []
+      }
+      whatsapp_notifications: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          instance_id: string
+          media_url: string | null
+          recipient: string
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          instance_id: string
+          media_url?: string | null
+          recipient: string
+          sent_at?: string | null
+          status: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          instance_id?: string
+          media_url?: string | null
+          recipient?: string
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
