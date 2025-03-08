@@ -10,6 +10,25 @@ import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 import Layout from "./components/Layout";
 import Settings from "./pages/Settings";
+import Students from "./pages/Students";
+import Payments from "./pages/Payments";
+import Expenses from "./pages/Expenses";
+import Groups from "./pages/Groups";
+import Notifications from "./pages/Notifications";
+import Teachers from "./pages/Teachers";
+import Staff from "./pages/Staff";
+import Attendance from "./pages/Attendance";
+import Curriculum from "./pages/Curriculum";
+import Syllabus from "./pages/Syllabus";
+import Timetable from "./pages/Timetable";
+import Exams from "./pages/Exams";
+import Progress from "./pages/Progress";
+import Donations from "./pages/Donations";
+import Salaries from "./pages/Salaries";
+import Fees from "./pages/Fees";
+import Materials from "./pages/Materials";
+import Events from "./pages/Events";
+import Users from "./pages/Users";
 
 const queryClient = new QueryClient();
 
@@ -24,25 +43,25 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route element={<Layout />}>
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/students" element={<div className="py-10 text-center">ছাত্র ব্যবস্থাপনা পেজ (বিকাশাধীন)</div>} />
-              <Route path="/payments" element={<div className="py-10 text-center">পেমেন্ট ব্যবস্থাপনা পেজ (বিকাশাধীন)</div>} />
-              <Route path="/expenses" element={<div className="py-10 text-center">খরচ ব্যবস্থাপনা পেজ (বিকাশাধীন)</div>} />
-              <Route path="/groups" element={<div className="py-10 text-center">গ্রুপ ব্যবস্থাপনা পেজ (বিকাশাধীন)</div>} />
-              <Route path="/notifications" element={<div className="py-10 text-center">নোটিফিকেশন পেজ (বিকাশাধীন)</div>} />
-              <Route path="/users" element={<div className="py-10 text-center">ইউজার ব্যবস্থাপনা পেজ (বিকাশাধীন)</div>} />
-              <Route path="/teachers" element={<div className="py-10 text-center">শিক্ষক ব্যবস্থাপনা পেজ (বিকাশাধীন)</div>} />
-              <Route path="/staff" element={<div className="py-10 text-center">কর্মচারী ব্যবস্থাপনা পেজ (বিকাশাধীন)</div>} />
-              <Route path="/attendance" element={<div className="py-10 text-center">উপস্থিতি ব্যবস্থাপনা পেজ (বিকাশাধীন)</div>} />
-              <Route path="/curriculum" element={<div className="py-10 text-center">পাঠ্যক্রম ব্যবস্থাপনা পেজ (বিকাশাধীন)</div>} />
-              <Route path="/syllabus" element={<div className="py-10 text-center">সিলেবাস ব্যবস্থাপনা পেজ (বিকাশাধীন)</div>} />
-              <Route path="/timetable" element={<div className="py-10 text-center">ক্লাস রুটিন ব্যবস্থাপনা পেজ (বিকাশাধীন)</div>} />
-              <Route path="/exams" element={<div className="py-10 text-center">পরীক্ষা ব্যবস্থাপনা পেজ (বিকাশাধীন)</div>} />
-              <Route path="/progress" element={<div className="py-10 text-center">ছাত্র প্রগতি ব্যবস্থাপনা পেজ (বিকাশাধীন)</div>} />
-              <Route path="/donations" element={<div className="py-10 text-center">অনুদান ব্যবস্থাপনা পেজ (বিকাশাধীন)</div>} />
-              <Route path="/salaries" element={<div className="py-10 text-center">বেতন ব্যবস্থাপনা পেজ (বিকাশাধীন)</div>} />
-              <Route path="/fees" element={<div className="py-10 text-center">ফি ব্যবস্থাপনা পেজ (বিকাশাধীন)</div>} />
-              <Route path="/materials" element={<div className="py-10 text-center">শিক্ষা উপকরণ ব্যবস্থাপনা পেজ (বিকাশাধীন)</div>} />
-              <Route path="/events" element={<div className="py-10 text-center">ইভেন্ট ব্যবস্থাপনা পেজ (বিকাশাধীন)</div>} />
+              <Route path="/students" element={<Students />} />
+              <Route path="/payments" element={<Payments />} />
+              <Route path="/expenses" element={<Expenses />} />
+              <Route path="/groups" element={<Groups />} />
+              <Route path="/notifications" element={<Notifications />} />
+              <Route path="/users" element={<Users />} />
+              <Route path="/teachers" element={<Teachers />} />
+              <Route path="/staff" element={<Staff />} />
+              <Route path="/attendance" element={<Attendance />} />
+              <Route path="/curriculum" element={<Curriculum />} />
+              <Route path="/syllabus" element={<Syllabus />} />
+              <Route path="/timetable" element={<Timetable />} />
+              <Route path="/exams" element={<Exams />} />
+              <Route path="/progress" element={<Progress />} />
+              <Route path="/donations" element={<Donations />} />
+              <Route path="/salaries" element={<Salaries />} />
+              <Route path="/fees" element={<Fees />} />
+              <Route path="/materials" element={<Materials />} />
+              <Route path="/events" element={<Events />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<NotFound />} />

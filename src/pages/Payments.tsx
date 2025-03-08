@@ -1,15 +1,18 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase, formatCurrency, toBengaliNumber, formatDateBengali } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Table,
   TableBody,
+  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -23,6 +26,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -30,488 +36,402 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Plus, MoreVertical, CheckCircle, XCircle, Filter } from "lucide-react";
-import type { Payment, PaymentType, Student } from "@/types";
+import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { 
+  fetchPayments, 
+  createPayment, 
+  updatePayment, 
+  deletePayment,
+  fetchStudents 
+} from "@/services/dataService";
+import { formatDateBengali, toBengaliNumber, formatCurrency } from "@/integrations/supabase/client";
+import { Payment, PaymentStatus, PaymentType, Student } from "@/types";
+import { 
+  Plus, 
+  Edit, 
+  Trash2, 
+  Search, 
+  Filter, 
+  CreditCard, 
+  Calendar, 
+  UserCheck,
+  AlertCircle,
+  CheckCircle,
+  XCircle
+} from "lucide-react";
 
 const Payments = () => {
   const { user } = useAuth();
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [activeTab, setActiveTab] = useState("all");
-  
-  // Form states
-  const [newPayment, setNewPayment] = useState({
+  const [statusFilter, setStatusFilter] = useState<PaymentStatus | "">("");
+  const [typeFilter, setTypeFilter] = useState<PaymentType | "">("");
+  const [currentPayment, setCurrentPayment] = useState<Payment | null>(null);
+  const [formData, setFormData] = useState<Partial<Payment>>({
     studentId: "",
-    amount: 500,
-    type: "monthly" as PaymentType,
+    amount: 0,
+    date: new Date().toISOString().split("T")[0],
+    type: "monthly",
     description: "",
+    status: "accepted",
+    acceptedBy: user?.id || "",
   });
 
-  const fetchStudents = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('students')
-        .select('*')
-        .eq('active', true)
-        .order('name', { ascending: true });
-      
-      if (error) throw error;
-      
-      const formattedStudents = data.map(student => ({
-        id: student.id,
-        name: student.name,
-        fatherName: student.father_name,
-        motherName: student.mother_name,
-        whatsappNumber: student.whatsapp_number,
-        address: student.address,
-        group: student.group_name,
-        monthlyFee: student.monthly_fee,
-        registrationDate: student.registration_date,
-        active: student.active
-      }));
-      
-      setStudents(formattedStudents);
-    } catch (error: any) {
-      console.error("Error fetching students:", error);
-      toast({
-        variant: "destructive",
-        title: "ত্রুটি ঘটেছে",
-        description: error.message,
-      });
-    }
-  };
+  // Fetch all payments
+  const { data: payments = [], isLoading: isLoadingPayments } = useQuery({
+    queryKey: ["payments"],
+    queryFn: fetchPayments,
+  });
 
-  const fetchPayments = async () => {
-    setLoading(true);
-    try {
-      let query = supabase
-        .from('payments')
-        .select(`
-          *,
-          students(name),
-          accepted_by:users!payments_accepted_by_fkey(name),
-          verified_by:users!payments_verified_by_fkey(name)
-        `)
-        .order('date', { ascending: false });
-      
-      if (activeTab !== "all") {
-        query = query.eq('status', activeTab);
-      }
-      
-      const { data, error } = await query;
-      
-      if (error) throw error;
-      
-      const formattedPayments = data.map(payment => ({
-        id: payment.id,
-        studentId: payment.student_id,
-        studentName: payment.students?.name || 'অজানা ছাত্র',
-        amount: payment.amount,
-        date: payment.date,
-        type: payment.type as PaymentType,
-        description: payment.description || '',
-        status: payment.status as "accepted" | "verified" | "rejected",
-        verifiedBy: payment.verified_by?.name,
-        acceptedBy: payment.accepted_by?.name || 'অজানা',
-      }));
-      
-      setPayments(formattedPayments);
-    } catch (error: any) {
-      console.error("Error fetching payments:", error);
-      toast({
-        variant: "destructive",
-        title: "ত্রুটি ঘটেছে",
-        description: error.message,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Fetch all students
+  const { data: students = [], isLoading: isLoadingStudents } = useQuery({
+    queryKey: ["students"],
+    queryFn: fetchStudents,
+  });
 
-  useEffect(() => {
-    fetchStudents();
-    fetchPayments();
-  }, []);
+  // Add payment mutation
+  const addPaymentMutation = useMutation({
+    mutationFn: createPayment,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      setIsAddDialogOpen(false);
+      resetForm();
+    },
+  });
 
-  useEffect(() => {
-    fetchPayments();
-  }, [activeTab]);
+  // Update payment mutation
+  const updatePaymentMutation = useMutation({
+    mutationFn: (payment: Partial<Payment>) => updatePayment(payment.id as string, payment),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      setIsEditDialogOpen(false);
+      resetForm();
+    },
+  });
 
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
-  };
+  // Delete payment mutation
+  const deletePaymentMutation = useMutation({
+    mutationFn: (id: string) => deletePayment(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      setIsDeleteDialogOpen(false);
+    },
+  });
 
-  const filteredPayments = payments.filter(payment => 
-    payment.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    payment.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
+  // Reset form
   const resetForm = () => {
-    setNewPayment({
+    setFormData({
       studentId: "",
-      amount: 500,
+      amount: 0,
+      date: new Date().toISOString().split("T")[0],
       type: "monthly",
       description: "",
+      status: "accepted",
+      acceptedBy: user?.id || "",
     });
+    setCurrentPayment(null);
   };
 
-  const handleCloseDialog = () => {
-    setShowAddDialog(false);
-    resetForm();
+  // Handle edit button click
+  const handleEdit = (payment: Payment) => {
+    setCurrentPayment(payment);
+    setFormData({
+      id: payment.id,
+      studentId: payment.studentId,
+      amount: payment.amount,
+      date: payment.date.split("T")[0],
+      type: payment.type,
+      description: payment.description || "",
+      status: payment.status,
+      acceptedBy: payment.acceptedBy,
+      verifiedBy: payment.verifiedBy,
+    });
+    setIsEditDialogOpen(true);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setNewPayment(prev => ({ ...prev, [name]: value }));
+  // Handle delete button click
+  const handleDelete = (payment: Payment) => {
+    setCurrentPayment(payment);
+    setIsDeleteDialogOpen(true);
   };
 
-  const handleSelectChange = (value: string, field: string) => {
-    setNewPayment(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    const numericValue = parseFloat(value);
-    if (!isNaN(numericValue)) {
-      setNewPayment(prev => ({ ...prev, [name]: numericValue }));
+  // Handle form input change
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target as HTMLInputElement;
+    if (type === "number") {
+      setFormData({ ...formData, [name]: parseFloat(value) });
+    } else {
+      setFormData({ ...formData, [name]: value });
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Handle select change
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData({ ...formData, [name]: value });
+  };
+
+  // Handle form submission
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newPayment.studentId) {
-      toast({
-        variant: "destructive",
-        title: "ছাত্র নির্বাচন করুন",
-        description: "পেমেন্ট যোগ করার জন্য একজন ছাত্র নির্বাচন করুন।",
-      });
-      return;
-    }
+    // Find the selected student to add studentName
+    const selectedStudent = students.find(student => student.id === formData.studentId);
+    const updatedData = {
+      ...formData,
+      studentName: selectedStudent?.name,
+      // Ensure user ID is set for new payments
+      acceptedBy: formData.acceptedBy || user?.id,
+    };
     
-    try {
-      // Add new payment
-      const { error } = await supabase
-        .from('payments')
-        .insert({
-          student_id: newPayment.studentId,
-          amount: newPayment.amount,
-          type: newPayment.type,
-          description: newPayment.description,
-          status: 'accepted',
-          accepted_by: user?.id,
-        });
-      
-      if (error) throw error;
-      
-      toast({
-        title: "পেমেন্ট যোগ সফল",
-        description: `পেমেন্ট সফলভাবে রেকর্ড করা হয়েছে।`,
-      });
-      
-      // Refresh the payment list
-      await fetchPayments();
-      handleCloseDialog();
-    } catch (error: any) {
-      console.error("Error saving payment:", error);
-      toast({
-        variant: "destructive",
-        title: "ত্রুটি ঘটেছে",
-        description: error.message,
-      });
+    if (currentPayment) {
+      updatePaymentMutation.mutate(updatedData);
+    } else {
+      addPaymentMutation.mutate(updatedData);
     }
   };
 
-  const handleVerify = async (payment: Payment) => {
-    try {
-      const { error } = await supabase
-        .from('payments')
-        .update({
-          status: 'verified',
-          verified_by: user?.id,
-        })
-        .eq('id', payment.id);
-      
-      if (error) throw error;
-      
-      toast({
-        title: "পেমেন্ট ভেরিফাই করা হয়েছে",
-        description: `${payment.studentName} এর ${formatCurrency(payment.amount)} টাকার পেমেন্ট ভেরিফাই করা হয়েছে।`,
-      });
-      
-      await fetchPayments();
-    } catch (error: any) {
-      console.error("Error verifying payment:", error);
-      toast({
-        variant: "destructive",
-        title: "ত্রুটি ঘটেছে",
-        description: error.message,
-      });
-    }
-  };
-
-  const handleReject = async (payment: Payment) => {
-    if (!confirm(`আপনি কি নিশ্চিত যে আপনি ${payment.studentName} এর ${formatCurrency(payment.amount)} টাকার পেমেন্ট বাতিল করতে চান?`)) {
-      return;
-    }
+  // Filter payments based on search term and filters
+  const filteredPayments = payments.filter((payment) => {
+    const studentName = students.find(s => s.id === payment.studentId)?.name || "";
     
-    try {
-      const { error } = await supabase
-        .from('payments')
-        .update({
-          status: 'rejected',
-          verified_by: user?.id,
-        })
-        .eq('id', payment.id);
-      
-      if (error) throw error;
-      
-      toast({
-        title: "পেমেন্ট বাতিল করা হয়েছে",
-        description: `${payment.studentName} এর ${formatCurrency(payment.amount)} টাকার পেমেন্ট বাতিল করা হয়েছে।`,
-      });
-      
-      await fetchPayments();
-    } catch (error: any) {
-      console.error("Error rejecting payment:", error);
-      toast({
-        variant: "destructive",
-        title: "ত্রুটি ঘটেছে",
-        description: error.message,
-      });
-    }
+    const matchesSearchTerm =
+      studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      payment.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      payment.id.includes(searchTerm);
+    
+    const matchesStatus = statusFilter ? payment.status === statusFilter : true;
+    const matchesType = typeFilter ? payment.type === typeFilter : true;
+    
+    return matchesSearchTerm && matchesStatus && matchesType;
+  });
+
+  // Find student name by id
+  const getStudentName = (studentId: string) => {
+    return students.find(student => student.id === studentId)?.name || "Unknown";
   };
 
-  const getPaymentTypeBangla = (type: PaymentType) => {
-    switch (type) {
-      case 'monthly': return 'মাসিক ফি';
-      case 'event': return 'ইভেন্ট ফি';
-      case 'other': return 'অন্যান্য';
-      default: return type;
-    }
-  };
-
-  const getStatusBadgeClass = (status: string) => {
+  // Get payment status display
+  const getStatusDisplay = (status: PaymentStatus) => {
     switch (status) {
-      case 'accepted':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'verified':
-        return 'bg-green-100 text-green-800';
-      case 'rejected':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusName = (status: string) => {
-    switch (status) {
-      case 'accepted':
-        return 'গ্রহণ করা হয়েছে';
-      case 'verified':
-        return 'যাচাইকৃত';
-      case 'rejected':
-        return 'বাতিল';
+      case "accepted":
+        return (
+          <div className="flex items-center text-amber-600">
+            <AlertCircle className="h-4 w-4 mr-1" />
+            <span>গৃহীত</span>
+          </div>
+        );
+      case "verified":
+        return (
+          <div className="flex items-center text-green-600">
+            <CheckCircle className="h-4 w-4 mr-1" />
+            <span>যাচাইকৃত</span>
+          </div>
+        );
+      case "rejected":
+        return (
+          <div className="flex items-center text-red-600">
+            <XCircle className="h-4 w-4 mr-1" />
+            <span>বাতিল</span>
+          </div>
+        );
       default:
         return status;
     }
   };
 
+  // Get payment type display
+  const getTypeDisplay = (type: PaymentType) => {
+    switch (type) {
+      case "monthly":
+        return "মাসিক ফি";
+      case "event":
+        return "ইভেন্ট ফি";
+      case "other":
+        return "অন্যান্য";
+      default:
+        return type;
+    }
+  };
+
   return (
     <div className="space-y-6 page-transition">
-      {/* Page header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-2xl font-semibold tracking-tight">পেমেন্ট ব্যবস্থাপনা</h2>
-        <div className="flex items-center space-x-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="ছাত্রের নাম খুঁজুন"
-              className="w-full pl-8 md:w-[250px] lg:w-[300px]"
-              value={searchTerm}
-              onChange={handleSearch}
-            />
-          </div>
-          <Button onClick={() => {
-            resetForm();
-            setShowAddDialog(true);
-          }}>
-            <Plus className="mr-2 h-4 w-4" /> নতুন পেমেন্ট
-          </Button>
-        </div>
+        <Button onClick={() => setIsAddDialogOpen(true)} className="btn-primary">
+          <Plus className="mr-2 h-4 w-4" /> নতুন পেমেন্ট রেকর্ড করুন
+        </Button>
       </div>
 
-      {/* Tabs for filtering */}
-      <Tabs
-        defaultValue="all"
-        value={activeTab}
-        onValueChange={(value) => setActiveTab(value)}
-        className="w-full"
-      >
-        <TabsList className="grid w-full grid-cols-3 md:w-auto md:inline-flex">
-          <TabsTrigger value="all">সকল পেমেন্ট</TabsTrigger>
-          <TabsTrigger value="accepted">অপেক্ষমান</TabsTrigger>
-          <TabsTrigger value="verified">যাচাইকৃত</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      {/* Payments list */}
       <Card>
-        <div className="relative w-full overflow-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ছাত্রের নাম</TableHead>
-                <TableHead>পরিমাণ</TableHead>
-                <TableHead className="hidden md:table-cell">তারিখ</TableHead>
-                <TableHead className="hidden md:table-cell">ধরন</TableHead>
-                <TableHead className="hidden lg:table-cell">স্ট্যাটাস</TableHead>
-                <TableHead className="hidden lg:table-cell">গ্রহণকারী</TableHead>
-                <TableHead className="text-right">অ্যাকশন</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-10">
-                    লোড হচ্ছে...
-                  </TableCell>
-                </TableRow>
-              ) : filteredPayments.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-10">
-                    কোন পেমেন্ট পাওয়া যায়নি
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredPayments.map((payment) => (
-                  <TableRow key={payment.id}>
-                    <TableCell>{payment.studentName}</TableCell>
-                    <TableCell>{formatCurrency(payment.amount)}</TableCell>
-                    <TableCell className="hidden md:table-cell">{formatDateBengali(payment.date)}</TableCell>
-                    <TableCell className="hidden md:table-cell">{getPaymentTypeBangla(payment.type)}</TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(payment.status)}`}>
-                        {getStatusName(payment.status)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">{payment.acceptedBy}</TableCell>
-                    <TableCell className="text-right">
-                      {payment.status === 'accepted' && user?.role === 'admin' && (
-                        <div className="flex justify-end space-x-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleVerify(payment)} title="ভেরিফাই করুন">
-                            <CheckCircle className="h-4 w-4 text-green-600" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleReject(payment)} title="বাতিল করুন">
-                            <XCircle className="h-4 w-4 text-red-600" />
-                          </Button>
-                        </div>
-                      )}
-                      {(payment.status === 'verified' || payment.status === 'rejected' || user?.role !== 'admin') && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>বিস্তারিত তথ্য</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="flex flex-col items-start">
-                              <span className="text-xs text-muted-foreground">ধরন:</span>
-                              <span>{getPaymentTypeBangla(payment.type)}</span>
-                            </DropdownMenuItem>
-                            {payment.description && (
-                              <DropdownMenuItem className="flex flex-col items-start">
-                                <span className="text-xs text-muted-foreground">বিবরণ:</span>
-                                <span>{payment.description}</span>
-                              </DropdownMenuItem>
-                            )}
-                            {payment.verifiedBy && (
-                              <DropdownMenuItem className="flex flex-col items-start">
-                                <span className="text-xs text-muted-foreground">যাচাইকারী:</span>
-                                <span>{payment.verifiedBy}</span>
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </TableCell>
+        <CardHeader>
+          <CardTitle>সকল পেমেন্ট</CardTitle>
+          <CardDescription>মোট {toBengaliNumber(filteredPayments.length)} টি পেমেন্ট</CardDescription>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mt-4">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="ছাত্রের নাম দিয়ে খুঁজুন"
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as PaymentStatus | "")}>
+                <SelectTrigger className="w-[130px]">
+                  <SelectValue placeholder="স্ট্যাটাস" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">সকল স্ট্যাটাস</SelectItem>
+                  <SelectItem value="accepted">গৃহীত</SelectItem>
+                  <SelectItem value="verified">যাচাইকৃত</SelectItem>
+                  <SelectItem value="rejected">বাতিল</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as PaymentType | "")}>
+                <SelectTrigger className="w-[130px]">
+                  <SelectValue placeholder="পেমেন্ট টাইপ" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">সকল টাইপ</SelectItem>
+                  <SelectItem value="monthly">মাসিক ফি</SelectItem>
+                  <SelectItem value="event">ইভেন্ট ফি</SelectItem>
+                  <SelectItem value="other">অন্যান্য</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoadingPayments ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          ) : filteredPayments.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              কোন পেমেন্ট পাওয়া যায়নি
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ছাত্রের নাম</TableHead>
+                    <TableHead>টাইপ</TableHead>
+                    <TableHead>তারিখ</TableHead>
+                    <TableHead>পরিমাণ</TableHead>
+                    <TableHead>বিবরণ</TableHead>
+                    <TableHead>স্ট্যাটাস</TableHead>
+                    <TableHead className="text-right">অ্যাকশন</TableHead>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                </TableHeader>
+                <TableBody>
+                  {filteredPayments.map((payment) => (
+                    <TableRow key={payment.id}>
+                      <TableCell className="font-medium">
+                        {getStudentName(payment.studentId)}
+                      </TableCell>
+                      <TableCell>{getTypeDisplay(payment.type)}</TableCell>
+                      <TableCell>{formatDateBengali(payment.date)}</TableCell>
+                      <TableCell>{formatCurrency(payment.amount)}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">{payment.description}</TableCell>
+                      <TableCell>{getStatusDisplay(payment.status)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(payment)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(payment)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
       </Card>
 
       {/* Add Payment Dialog */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>নতুন পেমেন্ট যোগ করুন</DialogTitle>
+            <DialogTitle>নতুন পেমেন্ট রেকর্ড করুন</DialogTitle>
             <DialogDescription>
-              ছাত্রের পেমেন্ট রেকর্ড করতে নিচের ফর্মটি পূরণ করুন।
+              নতুন পেমেন্টের বিবরণ ফর্মে পূরণ করুন।
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="grid gap-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="studentId">ছাত্র নির্বাচন করুন</Label>
-                <Select
-                  value={newPayment.studentId}
-                  onValueChange={(value) => handleSelectChange(value, 'studentId')}
+                <Label htmlFor="studentId">ছাত্র</Label>
+                <Select 
+                  value={formData.studentId} 
+                  onValueChange={(value) => handleSelectChange("studentId", value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="ছাত্র নির্বাচন করুন" />
                   </SelectTrigger>
                   <SelectContent>
-                    {students.map((student) => (
-                      <SelectItem key={student.id} value={student.id}>
-                        {student.name} ({formatCurrency(student.monthlyFee)})
-                      </SelectItem>
-                    ))}
+                    {students
+                      .filter(student => student.active)
+                      .map((student) => (
+                        <SelectItem key={student.id} value={student.id}>
+                          {student.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="amount">পরিমাণ (৳)</Label>
-                <Input
-                  id="amount"
-                  name="amount"
-                  type="number"
-                  value={newPayment.amount}
-                  onChange={handleNumberChange}
-                  required
-                />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="amount">পরিমাণ (৳)</Label>
+                  <Input
+                    id="amount"
+                    name="amount"
+                    type="number"
+                    value={formData.amount}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="date">তারিখ</Label>
+                  <Input
+                    id="date"
+                    name="date"
+                    type="date"
+                    value={formData.date}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="type">পেমেন্টের ধরন</Label>
-                <Select
-                  value={newPayment.type}
-                  onValueChange={(value) => handleSelectChange(value, 'type')}
+                <Label htmlFor="type">পেমেন্টের ধরণ</Label>
+                <Select 
+                  value={formData.type as string} 
+                  onValueChange={(value) => handleSelectChange("type", value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="পেমেন্টের ধরন নির্বাচন করুন" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="monthly">মাসিক ফি</SelectItem>
@@ -520,26 +440,202 @@ const Payments = () => {
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="description">বিবরণ (ঐচ্ছিক)</Label>
+                <Label htmlFor="description">বিবরণ</Label>
                 <Textarea
                   id="description"
                   name="description"
-                  placeholder="পেমেন্টের বিবরণ লিখুন"
-                  value={newPayment.description}
-                  onChange={handleInputChange}
+                  value={formData.description}
+                  onChange={handleChange}
+                  placeholder="পেমেন্টের বিস্তারিত বিবরণ দিন"
+                  className="min-h-[100px]"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="status">স্ট্যাটাস</Label>
+                <Select 
+                  value={formData.status as string} 
+                  onValueChange={(value) => handleSelectChange("status", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="accepted">গৃহীত</SelectItem>
+                    <SelectItem value="verified">যাচাইকৃত</SelectItem>
+                    <SelectItem value="rejected">বাতিল</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleCloseDialog}>
-                বাতিল করুন
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsAddDialogOpen(false);
+                  resetForm();
+                }}
+              >
+                বাতিল
               </Button>
-              <Button type="submit">
-                পেমেন্ট রেকর্ড করুন
+              <Button type="submit" disabled={addPaymentMutation.isPending}>
+                {addPaymentMutation.isPending ? "সংরক্ষণ হচ্ছে..." : "সংরক্ষণ করুন"}
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Payment Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>পেমেন্ট সম্পাদনা করুন</DialogTitle>
+            <DialogDescription>
+              পেমেন্টের তথ্য পরিবর্তন করুন।
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit}>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="studentId">ছাত্র</Label>
+                <Select 
+                  value={formData.studentId} 
+                  onValueChange={(value) => handleSelectChange("studentId", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="ছাত্র নির্বাচন করুন" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {students.map((student) => (
+                      <SelectItem key={student.id} value={student.id}>
+                        {student.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="amount">পরিমাণ (৳)</Label>
+                  <Input
+                    id="amount"
+                    name="amount"
+                    type="number"
+                    value={formData.amount}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="date">তারিখ</Label>
+                  <Input
+                    id="date"
+                    name="date"
+                    type="date"
+                    value={formData.date}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="type">পেমেন্টের ধরণ</Label>
+                <Select 
+                  value={formData.type as string} 
+                  onValueChange={(value) => handleSelectChange("type", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">মাসিক ফি</SelectItem>
+                    <SelectItem value="event">ইভেন্ট ফি</SelectItem>
+                    <SelectItem value="other">অন্যান্য</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">বিবরণ</Label>
+                <Textarea
+                  id="description"
+                  name="description"
+                  value={formData.description || ""}
+                  onChange={handleChange}
+                  placeholder="পেমেন্টের বিস্তারিত বিবরণ দিন"
+                  className="min-h-[100px]"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="status">স্ট্যাটাস</Label>
+                <Select 
+                  value={formData.status as string} 
+                  onValueChange={(value) => handleSelectChange("status", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="accepted">গৃহীত</SelectItem>
+                    <SelectItem value="verified">যাচাইকৃত</SelectItem>
+                    <SelectItem value="rejected">বাতিল</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsEditDialogOpen(false);
+                  resetForm();
+                }}
+              >
+                বাতিল
+              </Button>
+              <Button type="submit" disabled={updatePaymentMutation.isPending}>
+                {updatePaymentMutation.isPending ? "হালনাগাদ হচ্ছে..." : "হালনাগাদ করুন"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>পেমেন্ট মুছে ফেলার নিশ্চিতকরণ</DialogTitle>
+            <DialogDescription>
+              আপনি কি নিশ্চিত যে আপনি এই পেমেন্ট রেকর্ডটি মুছে ফেলতে চান?
+              এই ক্রিয়া অপরিবর্তনীয়।
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+            >
+              বাতিল
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => currentPayment?.id && deletePaymentMutation.mutate(currentPayment.id)}
+              disabled={deletePaymentMutation.isPending}
+            >
+              {deletePaymentMutation.isPending ? "মুছে ফেলা হচ্ছে..." : "মুছে ফেলুন"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

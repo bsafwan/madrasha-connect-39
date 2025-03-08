@@ -1,15 +1,18 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase, formatCurrency, toBengaliNumber } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Table,
   TableBody,
+  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -24,118 +27,101 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Search, Plus, MoreVertical, PenLine, Phone, Trash } from "lucide-react";
-import { Student, StudentGroup } from "@/types";
+import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { fetchStudents, createStudent, updateStudent, deleteStudent } from "@/services/dataService";
+import { formatDateBengali, toBengaliNumber } from "@/integrations/supabase/client";
+import { Student } from "@/types";
+import { Plus, Edit, Trash2, Search, Filter, User, Phone, Home, Book, Coins } from "lucide-react";
 
 const Students = () => {
   const { user } = useAuth();
-  const [students, setStudents] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
-  
-  // Form states
-  const [newStudent, setNewStudent] = useState({
+  const [filterGroup, setFilterGroup] = useState("");
+  const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
+  const [formData, setFormData] = useState<Partial<Student>>({
     name: "",
     fatherName: "",
     motherName: "",
     whatsappNumber: "",
     address: "",
-    group: "qaida" as StudentGroup,
+    group: "hifz",
     monthlyFee: 500,
-    active: true
+    active: true,
   });
 
-  const fetchStudents = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('students')
-        .select('*')
-        .order('name', { ascending: true });
-      
-      if (error) throw error;
-      
-      const formattedStudents = data.map(student => ({
-        id: student.id,
-        name: student.name,
-        fatherName: student.father_name,
-        motherName: student.mother_name,
-        whatsappNumber: student.whatsapp_number,
-        address: student.address,
-        group: student.group_name as StudentGroup,
-        monthlyFee: student.monthly_fee,
-        registrationDate: student.registration_date,
-        active: student.active
-      }));
-      
-      setStudents(formattedStudents);
-    } catch (error: any) {
-      console.error("Error fetching students:", error);
-      toast({
-        variant: "destructive",
-        title: "ত্রুটি ঘটেছে",
-        description: error.message,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Fetch all students
+  const { data: students = [], isLoading } = useQuery({
+    queryKey: ["students"],
+    queryFn: fetchStudents,
+  });
 
-  useEffect(() => {
-    fetchStudents();
-  }, []);
+  // Add student mutation
+  const addStudentMutation = useMutation({
+    mutationFn: createStudent,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+      setIsAddDialogOpen(false);
+      resetForm();
+    },
+  });
 
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
-  };
+  // Update student mutation
+  const updateStudentMutation = useMutation({
+    mutationFn: (student: Partial<Student>) => updateStudent(student.id as string, student),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+      setIsEditDialogOpen(false);
+      resetForm();
+    },
+  });
 
-  const filteredStudents = students.filter(student => 
-    student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.fatherName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.whatsappNumber.includes(searchTerm)
-  );
+  // Delete student mutation
+  const deleteStudentMutation = useMutation({
+    mutationFn: (id: string) => deleteStudent(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+      setIsDeleteDialogOpen(false);
+    },
+  });
 
+  // Reset form
   const resetForm = () => {
-    setNewStudent({
+    setFormData({
       name: "",
       fatherName: "",
       motherName: "",
       whatsappNumber: "",
       address: "",
-      group: "qaida" as StudentGroup,
+      group: "hifz",
       monthlyFee: 500,
-      active: true
+      active: true,
     });
-    setEditingStudent(null);
+    setCurrentStudent(null);
   };
 
-  const handleCloseDialog = () => {
-    setShowAddDialog(false);
-    resetForm();
-  };
-
+  // Handle edit button click
   const handleEdit = (student: Student) => {
-    setEditingStudent(student);
-    setNewStudent({
+    setCurrentStudent(student);
+    setFormData({
+      id: student.id,
       name: student.name,
       fatherName: student.fatherName,
       motherName: student.motherName,
@@ -143,303 +129,303 @@ const Students = () => {
       address: student.address,
       group: student.group,
       monthlyFee: student.monthlyFee,
-      active: student.active
+      active: student.active,
+      guardianPhone: student.guardianPhone,
+      emergencyContact: student.emergencyContact,
+      birthDate: student.birthDate,
+      enrollmentNumber: student.enrollmentNumber,
+      previousEducation: student.previousEducation,
+      medicalInfo: student.medicalInfo,
     });
-    setShowAddDialog(true);
+    setIsEditDialogOpen(true);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setNewStudent(prev => ({ ...prev, [name]: value }));
+  // Handle delete button click
+  const handleDelete = (student: Student) => {
+    setCurrentStudent(student);
+    setIsDeleteDialogOpen(true);
   };
 
-  const handleSwitchChange = (checked: boolean) => {
-    setNewStudent(prev => ({ ...prev, active: checked }));
-  };
-
-  const handleSelectChange = (value: string, field: string) => {
-    setNewStudent(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    const numericValue = parseFloat(value);
-    if (!isNaN(numericValue)) {
-      setNewStudent(prev => ({ ...prev, [name]: numericValue }));
+  // Handle form input change
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type } = e.target;
+    if (type === "number") {
+      setFormData({ ...formData, [name]: parseFloat(value) });
+    } else {
+      setFormData({ ...formData, [name]: value });
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Handle checkbox change
+  const handleCheckboxChange = (checked: boolean) => {
+    setFormData({ ...formData, active: checked });
+  };
+
+  // Handle select change
+  const handleSelectChange = (value: string) => {
+    setFormData({ ...formData, group: value });
+  };
+
+  // Handle form submission
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    try {
-      if (editingStudent) {
-        // Update existing student
-        const { error } = await supabase
-          .from('students')
-          .update({
-            name: newStudent.name,
-            father_name: newStudent.fatherName,
-            mother_name: newStudent.motherName,
-            whatsapp_number: newStudent.whatsappNumber,
-            address: newStudent.address,
-            group_name: newStudent.group,
-            monthly_fee: newStudent.monthlyFee,
-            active: newStudent.active
-          })
-          .eq('id', editingStudent.id);
-        
-        if (error) throw error;
-        
-        toast({
-          title: "ছাত্র আপডেট সফল",
-          description: `${newStudent.name} এর তথ্য সফলভাবে আপডেট করা হয়েছে।`,
-        });
-      } else {
-        // Add new student
-        const { error } = await supabase
-          .from('students')
-          .insert({
-            name: newStudent.name,
-            father_name: newStudent.fatherName,
-            mother_name: newStudent.motherName,
-            whatsapp_number: newStudent.whatsappNumber,
-            address: newStudent.address,
-            group_name: newStudent.group,
-            monthly_fee: newStudent.monthlyFee,
-            active: newStudent.active
-          });
-        
-        if (error) throw error;
-        
-        toast({
-          title: "ছাত্র যোগ সফল",
-          description: `${newStudent.name} সফলভাবে যোগ করা হয়েছে।`,
-        });
-      }
-      
-      // Refresh the student list
-      await fetchStudents();
-      handleCloseDialog();
-    } catch (error: any) {
-      console.error("Error saving student:", error);
-      toast({
-        variant: "destructive",
-        title: "ত্রুটি ঘটেছে",
-        description: error.message,
-      });
+    if (currentStudent) {
+      updateStudentMutation.mutate(formData);
+    } else {
+      addStudentMutation.mutate(formData);
     }
   };
 
-  const handleDelete = async (student: Student) => {
-    if (!confirm(`আপনি কি নিশ্চিত যে আপনি ${student.name} কে মুছতে চান?`)) {
-      return;
-    }
+  // Filter students based on search term and group
+  const filteredStudents = students.filter((student) => {
+    const matchesSearchTerm =
+      student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.fatherName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.whatsappNumber.includes(searchTerm);
     
-    try {
-      const { error } = await supabase
-        .from('students')
-        .delete()
-        .eq('id', student.id);
-      
-      if (error) throw error;
-      
-      toast({
-        title: "ছাত্র মুছে ফেলা সফল",
-        description: `${student.name} সফলভাবে মুছে ফেলা হয়েছে।`,
-      });
-      
-      await fetchStudents();
-    } catch (error: any) {
-      console.error("Error deleting student:", error);
-      toast({
-        variant: "destructive",
-        title: "ত্রুটি ঘটেছে",
-        description: error.message,
-      });
-    }
-  };
+    const matchesGroup = filterGroup ? student.group === filterGroup : true;
+    
+    return matchesSearchTerm && matchesGroup;
+  });
 
-  const getGroupNameBangla = (group: StudentGroup) => {
-    switch (group) {
-      case 'hifz': return 'হিফজ';
-      case 'qaida': return 'কায়দা';
-      case 'sifara': return 'সিফারা';
-      case 'najera': return 'নাযেরা';
-      default: return group;
-    }
-  };
+  // Get unique groups for filter dropdown
+  const uniqueGroups = [...new Set(students.map(student => student.group))];
 
   return (
     <div className="space-y-6 page-transition">
-      {/* Page header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-2xl font-semibold tracking-tight">ছাত্র ব্যবস্থাপনা</h2>
-        <div className="flex items-center space-x-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="নাম বা নম্বর দিয়ে খুঁজুন"
-              className="w-full pl-8 md:w-[250px] lg:w-[300px]"
-              value={searchTerm}
-              onChange={handleSearch}
-            />
-          </div>
-          <Button onClick={() => {
-            resetForm();
-            setShowAddDialog(true);
-          }}>
-            <Plus className="mr-2 h-4 w-4" /> নতুন ছাত্র
-          </Button>
-        </div>
+        <Button onClick={() => setIsAddDialogOpen(true)} className="btn-primary">
+          <Plus className="mr-2 h-4 w-4" /> নতুন ছাত্র যোগ করুন
+        </Button>
       </div>
 
-      {/* Students list */}
       <Card>
-        <div className="relative w-full overflow-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>নাম</TableHead>
-                <TableHead className="hidden md:table-cell">পিতার নাম</TableHead>
-                <TableHead className="hidden md:table-cell">গ্রুপ</TableHead>
-                <TableHead>হোয়াটসঅ্যাপ</TableHead>
-                <TableHead className="hidden lg:table-cell">মাসিক ফি</TableHead>
-                <TableHead className="hidden lg:table-cell">স্ট্যাটাস</TableHead>
-                <TableHead className="text-right">অ্যাকশন</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-10">
-                    লোড হচ্ছে...
-                  </TableCell>
-                </TableRow>
-              ) : filteredStudents.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-10">
-                    কোন ছাত্র পাওয়া যায়নি
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredStudents.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell>{student.name}</TableCell>
-                    <TableCell className="hidden md:table-cell">{student.fatherName}</TableCell>
-                    <TableCell className="hidden md:table-cell">{getGroupNameBangla(student.group)}</TableCell>
-                    <TableCell>{student.whatsappNumber}</TableCell>
-                    <TableCell className="hidden lg:table-cell">{formatCurrency(student.monthlyFee)}</TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <span className={`px-2 py-1 rounded-full text-xs ${student.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                        {student.active ? 'সক্রিয়' : 'নিষ্ক্রিয়'}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>অ্যাকশন</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleEdit(student)}>
-                            <PenLine className="mr-2 h-4 w-4" />
-                            এডিট করুন
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Phone className="mr-2 h-4 w-4" />
-                            হোয়াটসঅ্যাপ মেসেজ
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(student)}>
-                            <Trash className="mr-2 h-4 w-4" />
-                            মুছে ফেলুন
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+        <CardHeader>
+          <CardTitle>সকল ছাত্র</CardTitle>
+          <CardDescription>মোট {toBengaliNumber(filteredStudents.length)} জন ছাত্র</CardDescription>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mt-4">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="নাম বা নম্বর দিয়ে খুঁজুন"
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="w-full sm:w-48">
+              <Select value={filterGroup} onValueChange={setFilterGroup}>
+                <SelectTrigger>
+                  <Filter className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="গ্রুপ বাছাই করুন" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">সকল গ্রুপ</SelectItem>
+                  {uniqueGroups.map((group) => (
+                    <SelectItem key={group} value={group}>
+                      {group === "hifz" ? "হিফজ" : 
+                       group === "qaida" ? "কায়দা" : 
+                       group === "nazera" ? "নাযেরা" : 
+                       group === "sifara" ? "সিফারা" : group}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          ) : filteredStudents.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              কোন ছাত্র পাওয়া যায়নি
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>নাম</TableHead>
+                    <TableHead>বাবার নাম</TableHead>
+                    <TableHead>গ্রুপ</TableHead>
+                    <TableHead>যোগাযোগ</TableHead>
+                    <TableHead>মাসিক ফি</TableHead>
+                    <TableHead>স্ট্যাটাস</TableHead>
+                    <TableHead className="text-right">অ্যাকশন</TableHead>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                </TableHeader>
+                <TableBody>
+                  {filteredStudents.map((student) => (
+                    <TableRow key={student.id}>
+                      <TableCell className="font-medium">{student.name}</TableCell>
+                      <TableCell>{student.fatherName}</TableCell>
+                      <TableCell>
+                        {student.group === "hifz" ? "হিফজ" : 
+                        student.group === "qaida" ? "কায়দা" : 
+                        student.group === "nazera" ? "নাযেরা" : 
+                        student.group === "sifara" ? "সিফারা" : student.group}
+                      </TableCell>
+                      <TableCell>{student.whatsappNumber}</TableCell>
+                      <TableCell>৳{toBengaliNumber(student.monthlyFee)}</TableCell>
+                      <TableCell>
+                        <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          student.active
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        }`}>
+                          {student.active ? "সক্রিয়" : "নিষ্ক্রিয়"}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(student)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(student)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
       </Card>
 
-      {/* Add/Edit Student Dialog */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="sm:max-w-[600px]">
+      {/* Add Student Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>{editingStudent ? 'ছাত্র তথ্য আপডেট করুন' : 'নতুন ছাত্র যোগ করুন'}</DialogTitle>
+            <DialogTitle>নতুন ছাত্র যোগ করুন</DialogTitle>
             <DialogDescription>
-              নিচের ফর্মটি পূরণ করুন। সব তথ্য সঠিকভাবে লিখুন।
+              নতুন ছাত্রের বিবরণ ফর্মে পূরণ করুন।
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">ছাত্রের নাম</Label>
                   <Input
                     id="name"
                     name="name"
-                    placeholder="পূর্ণ নাম লিখুন"
-                    value={newStudent.name}
-                    onChange={handleInputChange}
+                    value={formData.name}
+                    onChange={handleChange}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="fatherName">পিতার নাম</Label>
+                  <Label htmlFor="enrollmentNumber">ভর্তি নম্বর</Label>
+                  <Input
+                    id="enrollmentNumber"
+                    name="enrollmentNumber"
+                    value={formData.enrollmentNumber || ""}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fatherName">বাবার নাম</Label>
                   <Input
                     id="fatherName"
                     name="fatherName"
-                    placeholder="পিতার নাম লিখুন"
-                    value={newStudent.fatherName}
-                    onChange={handleInputChange}
+                    value={formData.fatherName}
+                    onChange={handleChange}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="motherName">মাতার নাম</Label>
+                  <Label htmlFor="motherName">মায়ের নাম</Label>
                   <Input
                     id="motherName"
                     name="motherName"
-                    placeholder="মাতার নাম লিখুন"
-                    value={newStudent.motherName}
-                    onChange={handleInputChange}
+                    value={formData.motherName}
+                    onChange={handleChange}
                     required
                   />
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="whatsappNumber">হোয়াটসঅ্যাপ নম্বর</Label>
                   <Input
                     id="whatsappNumber"
                     name="whatsappNumber"
-                    placeholder="01XXXXXXXXX"
-                    value={newStudent.whatsappNumber}
-                    onChange={handleInputChange}
+                    value={formData.whatsappNumber}
+                    onChange={handleChange}
                     required
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="guardianPhone">অভিভাবকের ফোন নম্বর</Label>
+                  <Input
+                    id="guardianPhone"
+                    name="guardianPhone"
+                    value={formData.guardianPhone || ""}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="emergencyContact">জরুরী যোগাযোগ</Label>
+                  <Input
+                    id="emergencyContact"
+                    name="emergencyContact"
+                    value={formData.emergencyContact || ""}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="birthDate">জন্ম তারিখ</Label>
+                  <Input
+                    id="birthDate"
+                    name="birthDate"
+                    type="date"
+                    value={formData.birthDate || ""}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="address">ঠিকানা</Label>
+                <Input
+                  id="address"
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
                   <Label htmlFor="group">গ্রুপ</Label>
                   <Select
-                    value={newStudent.group}
-                    onValueChange={(value) => handleSelectChange(value, 'group')}
+                    value={formData.group}
+                    onValueChange={handleSelectChange}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="গ্রুপ নির্বাচন করুন" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="hifz">হিফজ</SelectItem>
                       <SelectItem value="qaida">কায়দা</SelectItem>
+                      <SelectItem value="nazera">নাযেরা</SelectItem>
                       <SelectItem value="sifara">সিফারা</SelectItem>
-                      <SelectItem value="najera">নাযেরা</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -449,42 +435,277 @@ const Students = () => {
                     id="monthlyFee"
                     name="monthlyFee"
                     type="number"
-                    placeholder="500"
-                    value={newStudent.monthlyFee}
-                    onChange={handleNumberChange}
+                    value={formData.monthlyFee}
+                    onChange={handleChange}
                     required
                   />
                 </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="address">ঠিকানা</Label>
-                  <Textarea
-                    id="address"
-                    name="address"
-                    placeholder="বিস্তারিত ঠিকানা লিখুন"
-                    value={newStudent.address}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="active"
-                    checked={newStudent.active}
-                    onCheckedChange={handleSwitchChange}
-                  />
-                  <Label htmlFor="active">সক্রিয় ছাত্র</Label>
-                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="previousEducation">আগের শিক্ষা (যদি থাকে)</Label>
+                <Input
+                  id="previousEducation"
+                  name="previousEducation"
+                  value={formData.previousEducation || ""}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="medicalInfo">মেডিকেল তথ্য (যদি থাকে)</Label>
+                <Input
+                  id="medicalInfo"
+                  name="medicalInfo"
+                  value={formData.medicalInfo || ""}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="active"
+                  checked={formData.active}
+                  onCheckedChange={handleCheckboxChange}
+                />
+                <label
+                  htmlFor="active"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  সক্রিয় ছাত্র
+                </label>
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleCloseDialog}>
-                বাতিল করুন
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsAddDialogOpen(false);
+                  resetForm();
+                }}
+              >
+                বাতিল
               </Button>
-              <Button type="submit">
-                {editingStudent ? 'আপডেট করুন' : 'যোগ করুন'}
+              <Button type="submit" disabled={addStudentMutation.isPending}>
+                {addStudentMutation.isPending ? "সংরক্ষণ হচ্ছে..." : "সংরক্ষণ করুন"}
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Student Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>ছাত্রের তথ্য সম্পাদনা করুন</DialogTitle>
+            <DialogDescription>
+              {currentStudent?.name} এর তথ্য পরিবর্তন করুন।
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">ছাত্রের নাম</Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="enrollmentNumber">ভর্তি নম্বর</Label>
+                  <Input
+                    id="enrollmentNumber"
+                    name="enrollmentNumber"
+                    value={formData.enrollmentNumber || ""}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fatherName">বাবার নাম</Label>
+                  <Input
+                    id="fatherName"
+                    name="fatherName"
+                    value={formData.fatherName}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="motherName">মায়ের নাম</Label>
+                  <Input
+                    id="motherName"
+                    name="motherName"
+                    value={formData.motherName}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="whatsappNumber">হোয়াটসঅ্যাপ নম্বর</Label>
+                  <Input
+                    id="whatsappNumber"
+                    name="whatsappNumber"
+                    value={formData.whatsappNumber}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="guardianPhone">অভিভাবকের ফোন নম্বর</Label>
+                  <Input
+                    id="guardianPhone"
+                    name="guardianPhone"
+                    value={formData.guardianPhone || ""}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="emergencyContact">জরুরী যোগাযোগ</Label>
+                  <Input
+                    id="emergencyContact"
+                    name="emergencyContact"
+                    value={formData.emergencyContact || ""}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="birthDate">জন্ম তারিখ</Label>
+                  <Input
+                    id="birthDate"
+                    name="birthDate"
+                    type="date"
+                    value={formData.birthDate || ""}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="address">ঠিকানা</Label>
+                <Input
+                  id="address"
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="group">গ্রুপ</Label>
+                  <Select
+                    value={formData.group}
+                    onValueChange={handleSelectChange}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hifz">হিফজ</SelectItem>
+                      <SelectItem value="qaida">কায়দা</SelectItem>
+                      <SelectItem value="nazera">নাযেরা</SelectItem>
+                      <SelectItem value="sifara">সিফারা</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="monthlyFee">মাসিক ফি (৳)</Label>
+                  <Input
+                    id="monthlyFee"
+                    name="monthlyFee"
+                    type="number"
+                    value={formData.monthlyFee}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="previousEducation">আগের শিক্ষা (যদি থাকে)</Label>
+                <Input
+                  id="previousEducation"
+                  name="previousEducation"
+                  value={formData.previousEducation || ""}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="medicalInfo">মেডিকেল তথ্য (যদি থাকে)</Label>
+                <Input
+                  id="medicalInfo"
+                  name="medicalInfo"
+                  value={formData.medicalInfo || ""}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="active"
+                  checked={formData.active}
+                  onCheckedChange={handleCheckboxChange}
+                />
+                <label
+                  htmlFor="active"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  সক্রিয় ছাত্র
+                </label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsEditDialogOpen(false);
+                  resetForm();
+                }}
+              >
+                বাতিল
+              </Button>
+              <Button type="submit" disabled={updateStudentMutation.isPending}>
+                {updateStudentMutation.isPending ? "হালনাগাদ হচ্ছে..." : "হালনাগাদ করুন"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>ছাত্র মুছে ফেলার নিশ্চিতকরণ</DialogTitle>
+            <DialogDescription>
+              আপনি কি নিশ্চিত যে আপনি {currentStudent?.name} কে মুছে ফেলতে চান?
+              এই ক্রিয়া অপরিবর্তনীয়।
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+            >
+              বাতিল
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => currentStudent?.id && deleteStudentMutation.mutate(currentStudent.id)}
+              disabled={deleteStudentMutation.isPending}
+            >
+              {deleteStudentMutation.isPending ? "মুছে ফেলা হচ্ছে..." : "মুছে ফেলুন"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
