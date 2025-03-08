@@ -12,7 +12,7 @@ export interface User {
 }
 
 // Student types
-export type StudentGroup = "hifz" | "qaida" | "sifara" | "najera";
+export type StudentGroup = "hifz" | "qaida" | "sifara" | "najera" | string;
 
 export interface Student {
   id: string;
@@ -46,7 +46,7 @@ export interface Payment {
 
 // Expense types
 export type ExpenseStatus = "pending" | "verified" | "rejected";
-export type ExpenseCategory = "fixed" | "dynamic" | "other";
+export type ExpenseCategory = "fixed" | "dynamic" | "other" | string;
 
 export interface Expense {
   id: string;
@@ -83,12 +83,14 @@ export interface ExamResult {
   remarks: string;
 }
 
+export type QuranProgressType = "parah" | "surah" | string;
+
 export interface QuranProgress {
   id: string;
   studentId: string;
   studentName?: string; // Added for UI display
   date: string; // ISO date string
-  type: "parah" | "surah";
+  type: QuranProgressType;
   progress: string; // e.g., "Completed Parah 5" or "Memorized Surah Al-Baqarah"
   verifiedBy?: string;
 }
