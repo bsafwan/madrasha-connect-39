@@ -1,15 +1,23 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase, formatCurrency, toBengaliNumber, formatDateBengali } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency, toBengaliNumber, formatDateBengali } from "@/integrations/supabase/client";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
+  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -22,542 +30,785 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Plus, MoreVertical, CheckCircle, XCircle, Calendar } from "lucide-react";
-import type { Expense, ExpenseCategory } from "@/types";
+import { toast } from "@/components/ui/use-toast";
+import { Expense, ExpenseCategory, ExpenseStatus } from "@/types";
+import { Trash2, PlusCircle, CheckCircle, XCircle } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import DataCard from "@/components/DataCard";
 
 const Expenses = () => {
   const { user } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [activeTab, setActiveTab] = useState("all");
-  
-  // Dynamic subcategory options
-  const subcategoryOptions = {
-    fixed: [
-      { value: "rent", label: "হল ভাড়া" },
-      { value: "electricity", label: "বিদ্যুৎ বিল" },
-      { value: "water", label: "পানি বিল" },
-      { value: "internet", label: "ইন্টারনেট বিল" },
-      { value: "salary", label: "বেতন" },
-    ],
-    dynamic: [
-      { value: "books", label: "বই-পুস্তক" },
-      { value: "stationary", label: "স্টেশনারি" },
-      { value: "repairs", label: "মেরামত" },
-      { value: "furniture", label: "আসবাবপত্র" },
-      { value: "cleaning", label: "পরিষ্কার পরিচ্ছন্নতা" },
-    ],
-    other: [
-      { value: "event", label: "অনুষ্ঠান" },
-      { value: "emergency", label: "জরুরি" },
-      { value: "miscellaneous", label: "বিবিধ" },
-    ]
-  };
-  
-  // Form states
-  const [newExpense, setNewExpense] = useState({
+  const [filteredExpenses, setFilteredExpenses] = useState<Expense[]>([]);
+  const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAdding, setIsAdding] = useState(false);
+  const [filter, setFilter] = useState("all");
+
+  const [formData, setFormData] = useState({
     title: "",
     amount: 0,
     category: "fixed" as ExpenseCategory,
-    subcategory: "rent",
+    subcategory: "",
     description: "",
   });
 
-  const fetchExpenses = async () => {
-    setLoading(true);
-    try {
-      let query = supabase
-        .from('expenses')
-        .select(`
-          *,
-          created_by_user:users!expenses_created_by_fkey(name),
-          verified_by_user:users!expenses_verified_by_fkey(name)
-        `)
-        .order('date', { ascending: false });
-      
-      if (activeTab !== "all") {
-        query = query.eq('status', activeTab);
+  const [stats, setStats] = useState({
+    totalExpenses: 0,
+    verifiedExpenses: 0,
+    pendingExpenses: 0,
+    rejectedExpenses: 0,
+  });
+
+  // Load expenses data
+  useEffect(() => {
+    const fetchExpenses = async () => {
+      try {
+        setIsLoading(true);
+        const { data: expensesData, error: expensesError } = await supabase
+          .from("expenses")
+          .select("*")
+          .order("date", { ascending: false });
+
+        if (expensesError) throw expensesError;
+
+        const { data: usersData, error: usersError } = await supabase
+          .from("users")
+          .select("id, name");
+
+        if (usersError) throw usersError;
+
+        setUsers(usersData || []);
+
+        // Add creator and verifier names to expenses
+        const expensesWithNames = expensesData?.map((expense) => {
+          const creator = usersData?.find((u) => u.id === expense.created_by);
+          const verifier = usersData?.find((u) => u.id === expense.verified_by);
+          return {
+            id: expense.id,
+            title: expense.title,
+            amount: expense.amount,
+            date: expense.date,
+            category: expense.category as ExpenseCategory,
+            subcategory: expense.subcategory,
+            description: expense.description || "",
+            status: expense.status as ExpenseStatus,
+            createdBy: expense.created_by,
+            createdByName: creator?.name || "অজানা",
+            verifiedBy: expense.verified_by,
+            verifiedByName: verifier?.name || "",
+          };
+        });
+
+        if (expensesWithNames) {
+          setExpenses(expensesWithNames);
+          setFilteredExpenses(expensesWithNames);
+
+          // Calculate stats
+          const total = expensesWithNames.reduce((sum, exp) => sum + Number(exp.amount), 0);
+          const verified = expensesWithNames
+            .filter((exp) => exp.status === "verified")
+            .reduce((sum, exp) => sum + Number(exp.amount), 0);
+          const pending = expensesWithNames
+            .filter((exp) => exp.status === "pending")
+            .reduce((sum, exp) => sum + Number(exp.amount), 0);
+          const rejected = expensesWithNames
+            .filter((exp) => exp.status === "rejected")
+            .reduce((sum, exp) => sum + Number(exp.amount), 0);
+
+          setStats({
+            totalExpenses: total,
+            verifiedExpenses: verified,
+            pendingExpenses: pending,
+            rejectedExpenses: rejected,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching expenses:", error);
+        toast({
+          variant: "destructive",
+          title: "ত্রুটি!",
+          description: "খরচের তথ্য লোড করতে সমস্যা হয়েছে।",
+        });
+      } finally {
+        setIsLoading(false);
       }
-      
-      const { data, error } = await query;
-      
-      if (error) throw error;
-      
-      const formattedExpenses = data.map(expense => ({
-        id: expense.id,
-        title: expense.title,
-        amount: expense.amount,
-        date: expense.date,
-        category: expense.category as ExpenseCategory,
-        subcategory: expense.subcategory,
-        description: expense.description || '',
-        status: expense.status as "pending" | "verified" | "rejected",
-        createdBy: expense.created_by,
-        createdByName: expense.created_by_user?.name || 'অজানা',
-        verifiedBy: expense.verified_by,
-        verifiedByName: expense.verified_by_user?.name,
-      }));
-      
-      setExpenses(formattedExpenses);
-    } catch (error: any) {
-      console.error("Error fetching expenses:", error);
-      toast({
-        variant: "destructive",
-        title: "ত্রুটি ঘটেছে",
-        description: error.message,
-      });
-    } finally {
-      setLoading(false);
+    };
+
+    fetchExpenses();
+  }, []);
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === "amount" ? Number(value) : value,
+    }));
+  };
+
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleFilterChange = (value: string) => {
+    setFilter(value);
+    if (value === "all") {
+      setFilteredExpenses(expenses);
+    } else {
+      setFilteredExpenses(expenses.filter((exp) => exp.status === value));
     }
   };
 
-  useEffect(() => {
-    fetchExpenses();
-  }, [activeTab]);
-
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
-  };
-
-  const filteredExpenses = expenses.filter(expense => 
-    expense.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    expense.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getSubcategoryLabel(expense.subcategory, expense.category).toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   const resetForm = () => {
-    setNewExpense({
+    setFormData({
       title: "",
       amount: 0,
-      category: "fixed",
-      subcategory: "rent",
+      category: "fixed" as ExpenseCategory,
+      subcategory: "",
       description: "",
     });
   };
 
-  const handleCloseDialog = () => {
-    setShowAddDialog(false);
-    resetForm();
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setNewExpense(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSelectChange = (value: string, field: string) => {
-    if (field === 'category') {
-      // When category changes, set the first subcategory of that category
-      const firstSubcategory = subcategoryOptions[value as ExpenseCategory][0].value;
-      setNewExpense(prev => ({ 
-        ...prev, 
-        [field]: value,
-        subcategory: firstSubcategory
-      }));
-    } else {
-      setNewExpense(prev => ({ ...prev, [field]: value }));
-    }
-  };
-
-  const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    const numericValue = parseFloat(value);
-    if (!isNaN(numericValue)) {
-      setNewExpense(prev => ({ ...prev, [name]: numericValue }));
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (newExpense.amount <= 0) {
-      toast({
-        variant: "destructive",
-        title: "অবৈধ পরিমাণ",
-        description: "অবশ্যই ০ টাকার বেশি পরিমাণ দিতে হবে।",
-      });
-      return;
-    }
-    
+    if (!user) return;
+
     try {
-      // Add new expense
-      const { error } = await supabase
-        .from('expenses')
-        .insert({
-          title: newExpense.title,
-          amount: newExpense.amount,
-          category: newExpense.category,
-          subcategory: newExpense.subcategory,
-          description: newExpense.description,
-          status: 'pending',
-          created_by: user?.id,
+      const { title, amount, category, subcategory, description } = formData;
+
+      if (!title || amount <= 0 || !subcategory) {
+        toast({
+          variant: "destructive",
+          title: "ফর্ম পূরণ করুন",
+          description: "সমস্ত প্রয়োজনীয় তথ্য দিন।",
         });
-      
+        return;
+      }
+
+      const newExpense = {
+        title,
+        amount,
+        category,
+        subcategory,
+        description,
+        status: "pending" as ExpenseStatus,
+        created_by: user.id,
+        date: new Date().toISOString(),
+      };
+
+      const { data, error } = await supabase.from("expenses").insert(newExpense).select();
+
       if (error) throw error;
-      
-      toast({
-        title: "খরচ যোগ সফল",
-        description: `খরচ সফলভাবে রেকর্ড করা হয়েছে।`,
-      });
-      
-      // Refresh the expense list
-      await fetchExpenses();
-      handleCloseDialog();
-    } catch (error: any) {
-      console.error("Error saving expense:", error);
+
+      if (data && data[0]) {
+        const createdExpense: Expense = {
+          id: data[0].id,
+          title: data[0].title,
+          amount: data[0].amount,
+          date: data[0].date,
+          category: data[0].category as ExpenseCategory,
+          subcategory: data[0].subcategory,
+          description: data[0].description || "",
+          status: data[0].status as ExpenseStatus,
+          createdBy: data[0].created_by,
+          createdByName: user.name,
+        };
+
+        setExpenses([createdExpense, ...expenses]);
+        if (filter === "all" || filter === "pending") {
+          setFilteredExpenses([createdExpense, ...filteredExpenses]);
+        }
+
+        setStats({
+          ...stats,
+          totalExpenses: stats.totalExpenses + amount,
+          pendingExpenses: stats.pendingExpenses + amount,
+        });
+
+        toast({
+          title: "খরচ যোগ করা হয়েছে",
+          description: "নতুন খরচ সফলভাবে যোগ করা হয়েছে।",
+        });
+
+        resetForm();
+        setIsAdding(false);
+      }
+    } catch (error) {
+      console.error("Error adding expense:", error);
       toast({
         variant: "destructive",
-        title: "ত্রুটি ঘটেছে",
-        description: error.message,
+        title: "ত্রুটি!",
+        description: "খরচ যোগ করতে সমস্যা হয়েছে।",
       });
     }
   };
 
-  const handleVerify = async (expense: Expense) => {
+  const handleUpdateStatus = async (id: string, newStatus: ExpenseStatus) => {
+    if (!user) return;
+
     try {
       const { error } = await supabase
-        .from('expenses')
+        .from("expenses")
         .update({
-          status: 'verified',
-          verified_by: user?.id,
+          status: newStatus,
+          verified_by: user.id,
         })
-        .eq('id', expense.id);
-      
+        .eq("id", id);
+
       if (error) throw error;
-      
+
+      // Update local state
+      const updatedExpenses = expenses.map((exp) =>
+        exp.id === id
+          ? {
+              ...exp,
+              status: newStatus,
+              verifiedBy: user.id,
+              verifiedByName: user.name,
+            }
+          : exp
+      );
+
+      setExpenses(updatedExpenses);
+      setFilteredExpenses(
+        filter === "all"
+          ? updatedExpenses
+          : updatedExpenses.filter((exp) => exp.status === filter)
+      );
+
+      // Update stats
+      const expense = expenses.find((exp) => exp.id === id);
+      if (expense) {
+        const amount = Number(expense.amount);
+        const oldStatus = expense.status;
+
+        const newStats = { ...stats };
+
+        // Remove from old status category
+        if (oldStatus === "pending") newStats.pendingExpenses -= amount;
+        else if (oldStatus === "verified") newStats.verifiedExpenses -= amount;
+        else if (oldStatus === "rejected") newStats.rejectedExpenses -= amount;
+
+        // Add to new status category
+        if (newStatus === "pending") newStats.pendingExpenses += amount;
+        else if (newStatus === "verified") newStats.verifiedExpenses += amount;
+        else if (newStatus === "rejected") newStats.rejectedExpenses += amount;
+
+        setStats(newStats);
+      }
+
       toast({
-        title: "খরচ অনুমোদিত হয়েছে",
-        description: `"${expense.title}" খরচটি অনুমোদিত হয়েছে।`,
+        title: "স্ট্যাটাস আপডেট হয়েছে",
+        description: `খরচের স্ট্যাটাস "${newStatus}" তে আপডেট করা হয়েছে।`,
       });
-      
-      await fetchExpenses();
-    } catch (error: any) {
-      console.error("Error verifying expense:", error);
+    } catch (error) {
+      console.error("Error updating expense status:", error);
       toast({
         variant: "destructive",
-        title: "ত্রুটি ঘটেছে",
-        description: error.message,
+        title: "ত্রুটি!",
+        description: "স্ট্যাটাস আপডেট করতে সমস্যা হয়েছে।",
       });
     }
   };
 
-  const handleReject = async (expense: Expense) => {
-    if (!confirm(`আপনি কি নিশ্চিত যে আপনি "${expense.title}" খরচটি বাতিল করতে চান?`)) {
-      return;
-    }
-    
+  const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('expenses')
-        .update({
-          status: 'rejected',
-          verified_by: user?.id,
-        })
-        .eq('id', expense.id);
-      
+      const { error } = await supabase.from("expenses").delete().eq("id", id);
+
       if (error) throw error;
-      
+
+      // Update local state
+      const expenseToRemove = expenses.find((exp) => exp.id === id);
+      const updatedExpenses = expenses.filter((exp) => exp.id !== id);
+      setExpenses(updatedExpenses);
+      setFilteredExpenses(
+        filter === "all"
+          ? updatedExpenses
+          : updatedExpenses.filter((exp) => exp.status === filter)
+      );
+
+      // Update stats
+      if (expenseToRemove) {
+        const amount = Number(expenseToRemove.amount);
+        const status = expenseToRemove.status;
+
+        const newStats = { ...stats };
+        newStats.totalExpenses -= amount;
+
+        if (status === "pending") newStats.pendingExpenses -= amount;
+        else if (status === "verified") newStats.verifiedExpenses -= amount;
+        else if (status === "rejected") newStats.rejectedExpenses -= amount;
+
+        setStats(newStats);
+      }
+
       toast({
-        title: "খরচ বাতিল করা হয়েছে",
-        description: `"${expense.title}" খরচটি বাতিল করা হয়েছে।`,
+        title: "খরচ ডিলিট করা হয়েছে",
+        description: "খরচ সফলভাবে ডিলিট করা হয়েছে।",
       });
-      
-      await fetchExpenses();
-    } catch (error: any) {
-      console.error("Error rejecting expense:", error);
+    } catch (error) {
+      console.error("Error deleting expense:", error);
       toast({
         variant: "destructive",
-        title: "ত্রুটি ঘটেছে",
-        description: error.message,
+        title: "ত্রুটি!",
+        description: "খরচ ডিলিট করতে সমস্যা হয়েছে।",
       });
-    }
-  };
-
-  const getCategoryLabel = (category: ExpenseCategory) => {
-    switch (category) {
-      case 'fixed': return 'নিয়মিত খরচ';
-      case 'dynamic': return 'অনিয়মিত খরচ';
-      case 'other': return 'অন্যান্য';
-      default: return category;
-    }
-  };
-
-  const getSubcategoryLabel = (subcategory: string, category: ExpenseCategory) => {
-    const option = subcategoryOptions[category].find(opt => opt.value === subcategory);
-    return option ? option.label : subcategory;
-  };
-
-  const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'verified':
-        return 'bg-green-100 text-green-800';
-      case 'rejected':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusName = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'অপেক্ষমান';
-      case 'verified':
-        return 'অনুমোদিত';
-      case 'rejected':
-        return 'বাতিল';
-      default:
-        return status;
     }
   };
 
   return (
-    <div className="space-y-6 page-transition">
-      {/* Page header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-2xl font-semibold tracking-tight">খরচ ব্যবস্থাপনা</h2>
-        <div className="flex items-center space-x-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="খরচের নাম খুঁজুন"
-              className="w-full pl-8 md:w-[250px] lg:w-[300px]"
-              value={searchTerm}
-              onChange={handleSearch}
-            />
-          </div>
-          <Button onClick={() => {
-            resetForm();
-            setShowAddDialog(true);
-          }}>
-            <Plus className="mr-2 h-4 w-4" /> নতুন খরচ
-          </Button>
-        </div>
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-6">খরচ ব্যবস্থাপনা</h1>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <DataCard
+          title="মোট খরচ"
+          value={formatCurrency(stats.totalExpenses)}
+          icon="৳"
+          className="bg-blue-50"
+        />
+        <DataCard
+          title="অনুমোদিত খরচ"
+          value={formatCurrency(stats.verifiedExpenses)}
+          icon="৳"
+          className="bg-green-50"
+        />
+        <DataCard
+          title="অপেক্ষমান খরচ"
+          value={formatCurrency(stats.pendingExpenses)}
+          icon="৳"
+          className="bg-yellow-50"
+        />
+        <DataCard
+          title="বাতিল খরচ"
+          value={formatCurrency(stats.rejectedExpenses)}
+          icon="৳"
+          className="bg-red-50"
+        />
       </div>
 
-      {/* Tabs for filtering */}
-      <Tabs
-        defaultValue="all"
-        value={activeTab}
-        onValueChange={(value) => setActiveTab(value)}
-        className="w-full"
-      >
-        <TabsList className="grid w-full grid-cols-3 md:w-auto md:inline-flex">
-          <TabsTrigger value="all">সকল খরচ</TabsTrigger>
-          <TabsTrigger value="pending">অপেক্ষমান</TabsTrigger>
-          <TabsTrigger value="verified">অনুমোদিত</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold">খরচের তালিকা</h2>
+        <Button onClick={() => setIsAdding(true)} className="flex items-center gap-2">
+          <PlusCircle className="h-4 w-4" /> নতুন খরচ যোগ করুন
+        </Button>
+      </div>
 
-      {/* Expenses list */}
-      <Card>
-        <div className="relative w-full overflow-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>খরচের নাম</TableHead>
-                <TableHead>পরিমাণ</TableHead>
-                <TableHead className="hidden md:table-cell">তারিখ</TableHead>
-                <TableHead className="hidden md:table-cell">ক্যাটাগরি</TableHead>
-                <TableHead className="hidden lg:table-cell">স্ট্যাটাস</TableHead>
-                <TableHead className="hidden lg:table-cell">তৈরি করেছেন</TableHead>
-                <TableHead className="text-right">অ্যাকশন</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-10">
-                    লোড হচ্ছে...
-                  </TableCell>
-                </TableRow>
-              ) : filteredExpenses.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-10">
-                    কোন খরচ পাওয়া যায়নি
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredExpenses.map((expense) => (
-                  <TableRow key={expense.id}>
-                    <TableCell>{expense.title}</TableCell>
-                    <TableCell>{formatCurrency(expense.amount)}</TableCell>
-                    <TableCell className="hidden md:table-cell">{formatDateBengali(expense.date)}</TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {getSubcategoryLabel(expense.subcategory, expense.category)}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(expense.status)}`}>
-                        {getStatusName(expense.status)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">{expense.createdByName}</TableCell>
-                    <TableCell className="text-right">
-                      {expense.status === 'pending' && user?.role === 'admin' && (
-                        <div className="flex justify-end space-x-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleVerify(expense)} title="অনুমোদন করুন">
-                            <CheckCircle className="h-4 w-4 text-green-600" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleReject(expense)} title="বাতিল করুন">
-                            <XCircle className="h-4 w-4 text-red-600" />
-                          </Button>
-                        </div>
-                      )}
-                      {(expense.status !== 'pending' || user?.role !== 'admin') && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>বিস্তারিত তথ্য</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="flex flex-col items-start">
-                              <span className="text-xs text-muted-foreground">ক্যাটাগরি:</span>
-                              <span>{getCategoryLabel(expense.category)} / {getSubcategoryLabel(expense.subcategory, expense.category)}</span>
-                            </DropdownMenuItem>
-                            {expense.description && (
-                              <DropdownMenuItem className="flex flex-col items-start">
-                                <span className="text-xs text-muted-foreground">বিবরণ:</span>
-                                <span>{expense.description}</span>
-                              </DropdownMenuItem>
-                            )}
-                            {expense.verifiedByName && (
-                              <DropdownMenuItem className="flex flex-col items-start">
-                                <span className="text-xs text-muted-foreground">অনুমোদনকারী:</span>
-                                <span>{expense.verifiedByName}</span>
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
-
-      {/* Add Expense Dialog */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+      <Dialog open={isAdding} onOpenChange={setIsAdding}>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>নতুন খরচ যোগ করুন</DialogTitle>
             <DialogDescription>
-              খরচ রেকর্ড করতে নিচের ফর্মটি পূরণ করুন।
+              নতুন খরচের বিবরণ দিন। সমস্ত তথ্য সঠিকভাবে পূরণ করুন।
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">খরচের নাম</Label>
+              <div className="grid gap-2">
+                <Label htmlFor="title">খরচের শিরোনাম</Label>
                 <Input
                   id="title"
                   name="title"
-                  placeholder="খরচের নাম লিখুন"
-                  value={newExpense.title}
+                  value={formData.title}
                   onChange={handleInputChange}
                   required
                 />
               </div>
-              <div className="space-y-2">
+
+              <div className="grid gap-2">
                 <Label htmlFor="amount">পরিমাণ (৳)</Label>
                 <Input
                   id="amount"
                   name="amount"
                   type="number"
-                  value={newExpense.amount}
-                  onChange={handleNumberChange}
+                  min="0"
+                  value={formData.amount}
+                  onChange={handleInputChange}
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="category">ক্যাটাগরি</Label>
+
+              <div className="grid gap-2">
+                <Label htmlFor="category">ক্যাটেগরি</Label>
                 <Select
-                  value={newExpense.category}
-                  onValueChange={(value) => handleSelectChange(value, 'category')}
+                  value={formData.category}
+                  onValueChange={(value) => handleSelectChange("category", value)}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="ক্যাটাগরি নির্বাচন করুন" />
+                  <SelectTrigger id="category">
+                    <SelectValue placeholder="ক্যাটেগরি নির্বাচন করুন" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="fixed">নিয়মিত খরচ</SelectItem>
-                    <SelectItem value="dynamic">অনিয়মিত খরচ</SelectItem>
+                    <SelectItem value="fixed">স্থায়ী খরচ</SelectItem>
+                    <SelectItem value="dynamic">অস্থায়ী খরচ</SelectItem>
                     <SelectItem value="other">অন্যান্য</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="subcategory">সাব-ক্যাটাগরি</Label>
-                <Select
-                  value={newExpense.subcategory}
-                  onValueChange={(value) => handleSelectChange(value, 'subcategory')}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="সাব-ক্যাটাগরি নির্বাচন করুন" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {subcategoryOptions[newExpense.category].map(option => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+
+              <div className="grid gap-2">
+                <Label htmlFor="subcategory">সাব-ক্যাটেগরি</Label>
+                <Input
+                  id="subcategory"
+                  name="subcategory"
+                  value={formData.subcategory}
+                  onChange={handleInputChange}
+                  required
+                />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">বিবরণ (ঐচ্ছিক)</Label>
+
+              <div className="grid gap-2">
+                <Label htmlFor="description">বিবরণ</Label>
                 <Textarea
                   id="description"
                   name="description"
-                  placeholder="খরচের বিবরণ লিখুন"
-                  value={newExpense.description}
+                  value={formData.description}
                   onChange={handleInputChange}
+                  rows={3}
                 />
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={handleCloseDialog}>
-                বাতিল করুন
+              <Button variant="outline" type="button" onClick={() => setIsAdding(false)}>
+                বাতিল
               </Button>
-              <Button type="submit">
-                খরচ রেকর্ড করুন
-              </Button>
+              <Button type="submit">সংরক্ষণ করুন</Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      <Tabs defaultValue="all" className="w-full mt-4" onValueChange={handleFilterChange}>
+        <TabsList className="grid grid-cols-4 mb-4">
+          <TabsTrigger value="all">সমস্ত খরচ</TabsTrigger>
+          <TabsTrigger value="pending">অপেক্ষমান</TabsTrigger>
+          <TabsTrigger value="verified">অনুমোদিত</TabsTrigger>
+          <TabsTrigger value="rejected">বাতিল</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all" className="mt-0">
+          <Card className="p-0">
+            {isLoading ? (
+              <div className="p-4 space-y-4">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="flex flex-col space-y-3">
+                    <Skeleton className="h-6 w-full" />
+                    <Skeleton className="h-4 w-4/5" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Table>
+                <TableCaption>মোট {filteredExpenses.length} টি খরচ</TableCaption>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>শিরোনাম</TableHead>
+                    <TableHead>পরিমাণ</TableHead>
+                    <TableHead>তারিখ</TableHead>
+                    <TableHead>ক্যাটেগরি</TableHead>
+                    <TableHead>অবস্থা</TableHead>
+                    <TableHead>সম্পাদক</TableHead>
+                    <TableHead>কর্ম</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredExpenses.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8">
+                        কোন খরচ পাওয়া যায়নি
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredExpenses.map((expense) => (
+                      <TableRow key={expense.id}>
+                        <TableCell className="font-medium">{expense.title}</TableCell>
+                        <TableCell>{formatCurrency(expense.amount)}</TableCell>
+                        <TableCell>{formatDateBengali(expense.date)}</TableCell>
+                        <TableCell>
+                          {expense.category === "fixed"
+                            ? "স্থায়ী"
+                            : expense.category === "dynamic"
+                            ? "অস্থায়ী"
+                            : "অন্যান্য"}{" "}
+                          ({expense.subcategory})
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs ${
+                              expense.status === "verified"
+                                ? "bg-green-100 text-green-800"
+                                : expense.status === "pending"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-red-100 text-red-800"
+                            }`}
+                          >
+                            {expense.status === "verified"
+                              ? "অনুমোদিত"
+                              : expense.status === "pending"
+                              ? "অপেক্ষমান"
+                              : "বাতিল"}
+                          </span>
+                        </TableCell>
+                        <TableCell>{expense.createdByName}</TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            {expense.status === "pending" && user?.role === "admin" && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleUpdateStatus(expense.id, "verified")}
+                                  title="অনুমোদন করুন"
+                                >
+                                  <CheckCircle className="h-4 w-4 text-green-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleUpdateStatus(expense.id, "rejected")}
+                                  title="বাতিল করুন"
+                                >
+                                  <XCircle className="h-4 w-4 text-red-600" />
+                                </Button>
+                              </>
+                            )}
+                            {(user?.role === "admin" ||
+                              (expense.status === "pending" &&
+                                user?.id === expense.createdBy)) && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDelete(expense.id)}
+                                title="ডিলিট করুন"
+                              >
+                                <Trash2 className="h-4 w-4 text-red-600" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            )}
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="pending" className="mt-0">
+          <Card className="p-0">
+            <Table>
+              <TableCaption>
+                অপেক্ষমান খরচ -{" "}
+                {filteredExpenses.filter((exp) => exp.status === "pending").length} টি
+              </TableCaption>
+              {/* Same table structure as above */}
+              <TableHeader>
+                <TableRow>
+                  <TableHead>শিরোনাম</TableHead>
+                  <TableHead>পরিমাণ</TableHead>
+                  <TableHead>তারিখ</TableHead>
+                  <TableHead>ক্যাটেগরি</TableHead>
+                  <TableHead>সম্পাদক</TableHead>
+                  <TableHead>কর্ম</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredExpenses.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      কোন অপেক্ষমান খরচ পাওয়া যায়নি
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredExpenses.map((expense) => (
+                    <TableRow key={expense.id}>
+                      <TableCell className="font-medium">{expense.title}</TableCell>
+                      <TableCell>{formatCurrency(expense.amount)}</TableCell>
+                      <TableCell>{formatDateBengali(expense.date)}</TableCell>
+                      <TableCell>
+                        {expense.category === "fixed"
+                          ? "স্থায়ী"
+                          : expense.category === "dynamic"
+                          ? "অস্থায়ী"
+                          : "অন্যান্য"}{" "}
+                        ({expense.subcategory})
+                      </TableCell>
+                      <TableCell>{expense.createdByName}</TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          {user?.role === "admin" && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleUpdateStatus(expense.id, "verified")}
+                                title="অনুমোদন করুন"
+                              >
+                                <CheckCircle className="h-4 w-4 text-green-600" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleUpdateStatus(expense.id, "rejected")}
+                                title="বাতিল করুন"
+                              >
+                                <XCircle className="h-4 w-4 text-red-600" />
+                              </Button>
+                            </>
+                          )}
+                          {(user?.role === "admin" || user?.id === expense.createdBy) && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(expense.id)}
+                              title="ডিলিট করুন"
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="verified" className="mt-0">
+          <Card className="p-0">
+            <Table>
+              <TableCaption>
+                অনুমোদিত খরচ -{" "}
+                {filteredExpenses.filter((exp) => exp.status === "verified").length} টি
+              </TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>শিরোনাম</TableHead>
+                  <TableHead>পরিমাণ</TableHead>
+                  <TableHead>তারিখ</TableHead>
+                  <TableHead>ক্যাটেগরি</TableHead>
+                  <TableHead>অনুমোদনকারী</TableHead>
+                  <TableHead>কর্ম</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredExpenses.filter((exp) => exp.status === "verified").length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      কোন অনুমোদিত খরচ পাওয়া যায়নি
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredExpenses.map(
+                    (expense) =>
+                      expense.status === "verified" && (
+                        <TableRow key={expense.id}>
+                          <TableCell className="font-medium">{expense.title}</TableCell>
+                          <TableCell>{formatCurrency(expense.amount)}</TableCell>
+                          <TableCell>{formatDateBengali(expense.date)}</TableCell>
+                          <TableCell>
+                            {expense.category === "fixed"
+                              ? "স্থায়ী"
+                              : expense.category === "dynamic"
+                              ? "অস্থায়ী"
+                              : "অন্যান্য"}{" "}
+                            ({expense.subcategory})
+                          </TableCell>
+                          <TableCell>{expense.verifiedByName}</TableCell>
+                          <TableCell>
+                            {user?.role === "admin" && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDelete(expense.id)}
+                                title="ডিলিট করুন"
+                              >
+                                <Trash2 className="h-4 w-4 text-red-600" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )
+                  )
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="rejected" className="mt-0">
+          <Card className="p-0">
+            <Table>
+              <TableCaption>
+                বাতিল খরচ - {filteredExpenses.filter((exp) => exp.status === "rejected").length}{" "}
+                টি
+              </TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>শিরোনাম</TableHead>
+                  <TableHead>পরিমাণ</TableHead>
+                  <TableHead>তারিখ</TableHead>
+                  <TableHead>ক্যাটেগরি</TableHead>
+                  <TableHead>বাতিলকারী</TableHead>
+                  <TableHead>কর্ম</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredExpenses.filter((exp) => exp.status === "rejected").length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      কোন বাতিল খরচ পাওয়া যায়নি
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredExpenses.map(
+                    (expense) =>
+                      expense.status === "rejected" && (
+                        <TableRow key={expense.id}>
+                          <TableCell className="font-medium">{expense.title}</TableCell>
+                          <TableCell>{formatCurrency(expense.amount)}</TableCell>
+                          <TableCell>{formatDateBengali(expense.date)}</TableCell>
+                          <TableCell>
+                            {expense.category === "fixed"
+                              ? "স্থায়ী"
+                              : expense.category === "dynamic"
+                              ? "অস্থায়ী"
+                              : "অন্যান্য"}{" "}
+                            ({expense.subcategory})
+                          </TableCell>
+                          <TableCell>{expense.verifiedByName}</TableCell>
+                          <TableCell>
+                            {user?.role === "admin" && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDelete(expense.id)}
+                                title="ডিলিট করুন"
+                              >
+                                <Trash2 className="h-4 w-4 text-red-600" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )
+                  )
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

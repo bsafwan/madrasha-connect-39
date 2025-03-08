@@ -34,6 +34,7 @@ export type PaymentType = "monthly" | "event" | "other";
 export interface Payment {
   id: string;
   studentId: string;
+  studentName?: string; // Added for UI display
   amount: number;
   date: string; // ISO date string
   type: PaymentType;
@@ -57,7 +58,9 @@ export interface Expense {
   description: string;
   status: ExpenseStatus;
   createdBy: string;
+  createdByName?: string; // Added for UI display
   verifiedBy?: string;
+  verifiedByName?: string; // Added for UI display
 }
 
 // Exam and progress types
@@ -72,6 +75,7 @@ export interface ExamResult {
   id: string;
   examId: string;
   studentId: string;
+  studentName?: string; // Added for UI display
   scores: {
     [key: string]: number; // e.g., {"reading": 90, "tajwid": 45}
   };
@@ -82,6 +86,7 @@ export interface ExamResult {
 export interface QuranProgress {
   id: string;
   studentId: string;
+  studentName?: string; // Added for UI display
   date: string; // ISO date string
   type: "parah" | "surah";
   progress: string; // e.g., "Completed Parah 5" or "Memorized Surah Al-Baqarah"
