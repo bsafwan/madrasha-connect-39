@@ -24,9 +24,12 @@ const handleError = (error: Error, customMessage: string) => {
   throw error;
 };
 
+// Define table names as a type to avoid string literals
+type TableName = "students" | "payments" | "expenses" | "teachers" | "staff" | "donations" | "events" | "whatsapp_notifications" | "users";
+
 // Generic function to fetch data with explicit table types
 const fetchData = async <T>(
-  tableName: "students" | "payments" | "expenses" | "teachers" | "staff" | "donations" | "events" | "whatsapp_notifications" | "users",
+  tableName: TableName,
   orderBy?: string,
   ascending: boolean = true,
   whereClause?: { column: string; value: any }
@@ -48,7 +51,7 @@ const fetchData = async <T>(
       throw error;
     }
     
-    return data as unknown as T[];
+    return data as T[];
   } catch (error) {
     handleError(error as Error, `ডাটা লোড করতে সমস্যা হয়েছে`);
     return [];
