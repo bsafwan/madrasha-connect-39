@@ -1,104 +1,93 @@
 
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { User, UserRole } from "@/types";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
-interface AuthContextType {
+// Define the shape of our context
+type AuthContextType = {
   user: User | null;
+  isAdmin: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-  isAllowed: (roles: UserRole[]) => boolean;
-}
+  logout: () => Promise<void>;
+};
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Mock user type
+type User = {
+  id: string;
+  email: string;
+  name: string;
+  role: 'admin' | 'teacher' | 'staff' | 'user';
+};
 
+// Create the context with a default value
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  isAdmin: false,
+  isLoading: true,
+  login: async () => {},
+  logout: async () => {},
+});
+
+// Context provider component
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // For demo purposes, simulate an authenticated user (admin)
   useEffect(() => {
-    // Check for saved user in localStorage
-    const savedUser = localStorage.getItem("user");
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setIsLoading(false);
+    // Simulating loading auth state
+    setTimeout(() => {
+      setUser({
+        id: '1',
+        email: 'admin@example.com',
+        name: 'Admin User',
+        role: 'admin'
+      });
+      setIsLoading(false);
+    }, 1000);
   }, []);
 
+  // Check if user is admin
+  const isAdmin = user?.role === 'admin';
+
+  // Mock login function
   const login = async (email: string, password: string) => {
     setIsLoading(true);
-    
-    try {
-      // Query the users table for the given email and password
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', email)
-        .eq('password', password)
-        .maybeSingle();
-      
-      if (error) {
-        throw new Error(error.message);
-      }
-      
-      if (!data) {
-        throw new Error("ইমেইল বা পাসওয়ার্ড ভুল");
-      }
-      
-      // Format user data and save to state/localStorage
-      const userData: User = {
-        id: data.id,
-        name: data.name,
-        email: data.email,
-        phone: data.phone,
-        role: data.role as UserRole,
-      };
-      
-      localStorage.setItem("user", JSON.stringify(userData));
-      setUser(userData);
-      toast({
-        title: "সফল লগইন",
-        description: `স্বাগতম, ${userData.name}!`,
+    // Mock API call
+    setTimeout(() => {
+      setUser({
+        id: '1',
+        email,
+        name: email.split('@')[0],
+        role: email.includes('admin') ? 'admin' : 'user'
       });
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "লগইন ব্যর্থ",
-        description: error.message,
-      });
-      throw error;
-    } finally {
       setIsLoading(false);
-    }
+    }, 1000);
   };
 
-  const logout = () => {
-    localStorage.removeItem("user");
-    setUser(null);
-    toast({
-      title: "লগআউট সফল",
-      description: "আপনি সফলভাবে লগআউট হয়েছেন।",
-    });
-  };
-
-  const isAllowed = (roles: UserRole[]) => {
-    if (!user) return false;
-    return roles.includes(user.role);
+  // Mock logout function
+  const logout = async () => {
+    setIsLoading(true);
+    // Mock API call
+    setTimeout(() => {
+      setUser(null);
+      setIsLoading(false);
+    }, 1000);
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, isAllowed }}>
+    <AuthContext.Provider value={{ user, isAdmin, isLoading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
+// Custom hook to use the auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
+
+export default AuthContext;

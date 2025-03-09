@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Student, 
@@ -17,17 +16,14 @@ import {
 } from "@/types";
 import { toast } from "sonner";
 
-// Error handling utility function
 const handleError = (error: Error, customMessage: string) => {
   console.error("API Error:", error);
   toast.error(customMessage || "একটি ত্রুটি হয়েছে");
   throw error;
 };
 
-// Define table names as a type to avoid string literals
 type TableName = "students" | "payments" | "expenses" | "teachers" | "staff" | "donations" | "events" | "whatsapp_notifications" | "users";
 
-// Generic function to fetch data with explicit table types
 const fetchData = async <T>(
   tableName: TableName,
   orderBy?: string,
@@ -58,7 +54,6 @@ const fetchData = async <T>(
   }
 };
 
-// Students
 export const fetchStudents = async (): Promise<Student[]> => {
   try {
     const { data, error } = await supabase
@@ -70,7 +65,6 @@ export const fetchStudents = async (): Promise<Student[]> => {
       throw error;
     }
 
-    // Transform the database response to match our Student type
     return data.map(item => ({
       id: item.id,
       name: item.name,
@@ -98,7 +92,6 @@ export const fetchStudents = async (): Promise<Student[]> => {
 
 export const createStudent = async (student: Omit<Student, "id" | "registrationDate" | "updatedAt">): Promise<Student | null> => {
   try {
-    // Convert from camelCase to snake_case for database
     const dbStudent = {
       name: student.name,
       father_name: student.fatherName,
@@ -126,7 +119,6 @@ export const createStudent = async (student: Omit<Student, "id" | "registrationD
       throw error;
     }
 
-    // Transform back to our Student type
     return {
       id: data.id,
       name: data.name,
@@ -154,7 +146,6 @@ export const createStudent = async (student: Omit<Student, "id" | "registrationD
 
 export const updateStudent = async (id: string, student: Partial<Student>): Promise<Student | null> => {
   try {
-    // Convert from camelCase to snake_case for database
     const dbStudent: Record<string, any> = {};
     
     if (student.name !== undefined) dbStudent.name = student.name;
@@ -183,7 +174,6 @@ export const updateStudent = async (id: string, student: Partial<Student>): Prom
       throw error;
     }
 
-    // Transform back to our Student type
     return {
       id: data.id,
       name: data.name,
@@ -209,7 +199,6 @@ export const updateStudent = async (id: string, student: Partial<Student>): Prom
   }
 };
 
-// Add the deleteStudent function
 export const deleteStudent = async (id: string): Promise<boolean> => {
   try {
     const { error } = await supabase
@@ -228,7 +217,6 @@ export const deleteStudent = async (id: string): Promise<boolean> => {
   }
 };
 
-// Payments
 export const fetchPayments = async (): Promise<Payment[]> => {
   try {
     const { data, error } = await supabase
@@ -301,7 +289,6 @@ export const createPayment = async (payment: Omit<Payment, "id" | "updatedAt" | 
   }
 };
 
-// Add the updatePayment function
 export const updatePayment = async (id: string, payment: Partial<Payment>): Promise<Payment | null> => {
   try {
     const dbPayment: Record<string, any> = {};
@@ -345,7 +332,6 @@ export const updatePayment = async (id: string, payment: Partial<Payment>): Prom
   }
 };
 
-// Add the deletePayment function
 export const deletePayment = async (id: string): Promise<boolean> => {
   try {
     const { error } = await supabase
@@ -364,7 +350,6 @@ export const deletePayment = async (id: string): Promise<boolean> => {
   }
 };
 
-// Expenses
 export const fetchExpenses = async (): Promise<Expense[]> => {
   try {
     const { data, error } = await supabase
@@ -444,7 +429,6 @@ export const createExpense = async (expense: Omit<Expense, "id" | "updatedAt">):
   }
 };
 
-// Teachers
 export const fetchTeachers = async (): Promise<Teacher[]> => {
   try {
     const { data, error } = await supabase
@@ -474,7 +458,107 @@ export const fetchTeachers = async (): Promise<Teacher[]> => {
   }
 };
 
-// Staff
+export const createTeacher = async (teacher: Omit<Teacher, "id" | "joiningDate">): Promise<Teacher | null> => {
+  try {
+    const dbTeacher = {
+      name: teacher.name,
+      phone: teacher.phone,
+      email: teacher.email || null,
+      address: teacher.address || null,
+      qualification: teacher.qualification || null,
+      specialty: teacher.specialty || null,
+      salary: teacher.salary,
+      active: teacher.active
+    };
+
+    const { data, error } = await supabase
+      .from("teachers")
+      .insert(dbTeacher)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      phone: data.phone,
+      email: data.email || "",
+      address: data.address || "",
+      qualification: data.qualification || "",
+      specialty: data.specialty || "",
+      salary: data.salary,
+      joiningDate: data.joining_date,
+      active: data.active
+    };
+  } catch (error) {
+    handleError(error as Error, `শিক্ষক যোগ করতে সমস্যা হয়েছে`);
+    return null;
+  }
+};
+
+export const updateTeacher = async (id: string, teacher: Partial<Teacher>): Promise<Teacher | null> => {
+  try {
+    const dbTeacher: Record<string, any> = {};
+    
+    if (teacher.name !== undefined) dbTeacher.name = teacher.name;
+    if (teacher.phone !== undefined) dbTeacher.phone = teacher.phone;
+    if (teacher.email !== undefined) dbTeacher.email = teacher.email || null;
+    if (teacher.address !== undefined) dbTeacher.address = teacher.address || null;
+    if (teacher.qualification !== undefined) dbTeacher.qualification = teacher.qualification || null;
+    if (teacher.specialty !== undefined) dbTeacher.specialty = teacher.specialty || null;
+    if (teacher.salary !== undefined) dbTeacher.salary = teacher.salary;
+    if (teacher.active !== undefined) dbTeacher.active = teacher.active;
+
+    const { data, error } = await supabase
+      .from("teachers")
+      .update(dbTeacher)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      phone: data.phone,
+      email: data.email || "",
+      address: data.address || "",
+      qualification: data.qualification || "",
+      specialty: data.specialty || "",
+      salary: data.salary,
+      joiningDate: data.joining_date,
+      active: data.active
+    };
+  } catch (error) {
+    handleError(error as Error, `শিক্ষকের তথ্য আপডেট করতে সমস্যা হয়েছে`);
+    return null;
+  }
+};
+
+export const deleteTeacher = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from("teachers")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      throw error;
+    }
+
+    return true;
+  } catch (error) {
+    handleError(error as Error, `শিক্ষক মুছতে সমস্যা হয়েছে`);
+    return false;
+  }
+};
+
 export const fetchStaff = async (): Promise<Staff[]> => {
   try {
     const { data, error } = await supabase
@@ -502,7 +586,6 @@ export const fetchStaff = async (): Promise<Staff[]> => {
   }
 };
 
-// Donations
 export const fetchDonations = async (): Promise<Donation[]> => {
   try {
     const { data, error } = await supabase
@@ -523,7 +606,7 @@ export const fetchDonations = async (): Promise<Donation[]> => {
       description: item.description || "",
       status: item.status as DonationStatus,
       createdBy: item.created_by,
-      createdAt: item.created_at // Add the missing createdAt property
+      createdAt: item.created_at
     }));
   } catch (error) {
     handleError(error as Error, `দানের ডাটা লোড করতে সমস্যা হয়েছে`);
@@ -531,7 +614,6 @@ export const fetchDonations = async (): Promise<Donation[]> => {
   }
 };
 
-// Events
 export const fetchEvents = async (): Promise<Event[]> => {
   try {
     const { data, error } = await supabase
@@ -559,7 +641,6 @@ export const fetchEvents = async (): Promise<Event[]> => {
   }
 };
 
-// WhatsApp Notifications
 export const fetchNotifications = async (): Promise<WhatsAppNotification[]> => {
   try {
     const { data, error } = await supabase
@@ -676,7 +757,6 @@ export const deleteNotification = async (id: string): Promise<boolean> => {
   }
 };
 
-// Users
 export const fetchUsers = async (): Promise<User[]> => {
   try {
     const { data, error } = await supabase
