@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -96,7 +95,7 @@ const Payments = () => {
 
   // Add payment mutation
   const addPaymentMutation = useMutation({
-    mutationFn: createPayment,
+    mutationFn: (paymentData: Omit<Payment, "id" | "updatedAt" | "createdAt" | "studentName">) => createPayment(paymentData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payments"] });
       setIsAddDialogOpen(false);
@@ -106,7 +105,7 @@ const Payments = () => {
 
   // Update payment mutation
   const updatePaymentMutation = useMutation({
-    mutationFn: (payment: Partial<Payment>) => updatePayment(payment.id as string, payment),
+    mutationFn: (payment: { id: string, data: Partial<Payment> }) => updatePayment(payment.id, payment.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payments"] });
       setIsEditDialogOpen(false);
@@ -181,17 +180,31 @@ const Payments = () => {
     
     // Find the selected student to add studentName
     const selectedStudent = students.find(student => student.id === formData.studentId);
-    const updatedData = {
-      ...formData,
-      studentName: selectedStudent?.name,
-      // Ensure user ID is set for new payments
-      acceptedBy: formData.acceptedBy || user?.id,
-    };
     
     if (currentPayment) {
-      updatePaymentMutation.mutate(updatedData);
+      updatePaymentMutation.mutate({ 
+        id: currentPayment.id,
+        data: {
+          ...formData,
+          // Ensure required fields are present for update
+          type: formData.type || currentPayment.type,
+          status: formData.status || currentPayment.status,
+        }
+      });
     } else {
-      addPaymentMutation.mutate(updatedData);
+      // Ensure required fields are present for create
+      const newPayment: Omit<Payment, "id" | "updatedAt" | "createdAt" | "studentName"> = {
+        studentId: formData.studentId || "",
+        amount: formData.amount || 0,
+        date: formData.date || new Date().toISOString(),
+        type: formData.type || "monthly",
+        description: formData.description || "",
+        status: formData.status || "accepted",
+        acceptedBy: formData.acceptedBy || user?.id || "",
+        verifiedBy: formData.verifiedBy
+      };
+      
+      addPaymentMutation.mutate(newPayment);
     }
   };
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -75,7 +74,25 @@ const Students = () => {
 
   // Add student mutation
   const addStudentMutation = useMutation({
-    mutationFn: createStudent,
+    mutationFn: (studentData: Omit<Student, "id" | "registrationDate" | "updatedAt">) => {
+      const student: Omit<Student, "id" | "registrationDate" | "updatedAt"> = {
+        name: studentData.name,
+        fatherName: studentData.fatherName,
+        motherName: studentData.motherName,
+        whatsappNumber: studentData.whatsappNumber,
+        address: studentData.address,
+        group: studentData.group,
+        monthlyFee: studentData.monthlyFee,
+        active: studentData.active,
+        guardianPhone: studentData.guardianPhone,
+        emergencyContact: studentData.emergencyContact,
+        birthDate: studentData.birthDate,
+        enrollmentNumber: studentData.enrollmentNumber,
+        previousEducation: studentData.previousEducation,
+        medicalInfo: studentData.medicalInfo
+      };
+      return createStudent(student);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["students"] });
       setIsAddDialogOpen(false);
@@ -85,7 +102,7 @@ const Students = () => {
 
   // Update student mutation
   const updateStudentMutation = useMutation({
-    mutationFn: (student: Partial<Student>) => updateStudent(student.id as string, student),
+    mutationFn: (student: { id: string, data: Partial<Student> }) => updateStudent(student.id, student.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["students"] });
       setIsEditDialogOpen(false);
@@ -170,9 +187,28 @@ const Students = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (currentStudent) {
-      updateStudentMutation.mutate(formData);
+      updateStudentMutation.mutate({ 
+        id: currentStudent.id,
+        data: formData
+      });
     } else {
-      addStudentMutation.mutate(formData);
+      const newStudent: Omit<Student, "id" | "registrationDate" | "updatedAt"> = {
+        name: formData.name || "",
+        fatherName: formData.fatherName || "",
+        motherName: formData.motherName || "",
+        whatsappNumber: formData.whatsappNumber || "",
+        address: formData.address || "",
+        group: formData.group || "hifz",
+        monthlyFee: formData.monthlyFee || 500,
+        active: formData.active === undefined ? true : formData.active,
+        guardianPhone: formData.guardianPhone,
+        emergencyContact: formData.emergencyContact,
+        birthDate: formData.birthDate,
+        enrollmentNumber: formData.enrollmentNumber,
+        previousEducation: formData.previousEducation,
+        medicalInfo: formData.medicalInfo
+      };
+      addStudentMutation.mutate(newStudent);
     }
   };
 

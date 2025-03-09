@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -78,26 +77,23 @@ const Notifications = () => {
     content: "",
     media_url: "",
     instance_id: "default",
-    status: "pending"
+    status: "pending" as "pending" | "sent" | "failed"
   });
   const [recipientType, setRecipientType] = useState<"individual" | "group">("individual");
   const [selectedGroup, setSelectedGroup] = useState<string>("");
 
-  // Fetch notifications
   const { data: notifications = [], isLoading: isLoadingNotifications } = useQuery({
     queryKey: ["notifications"],
     queryFn: fetchNotifications,
   });
 
-  // Fetch all students for recipient selection
   const { data: students = [], isLoading: isLoadingStudents } = useQuery({
     queryKey: ["students"],
     queryFn: fetchStudents,
   });
 
-  // Add notification mutation
   const addNotificationMutation = useMutation({
-    mutationFn: createNotification,
+    mutationFn: (notificationData: Omit<WhatsAppNotification, "id" | "createdAt" | "sentAt">) => createNotification(notificationData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       setIsAddDialogOpen(false);
@@ -106,7 +102,6 @@ const Notifications = () => {
     },
   });
 
-  // Update notification (resend) mutation
   const updateNotificationMutation = useMutation({
     mutationFn: (notification: Partial<WhatsAppNotification>) => 
       updateNotification(notification.id as string, { status: "pending" }),
@@ -116,7 +111,6 @@ const Notifications = () => {
     },
   });
 
-  // Delete notification mutation
   const deleteNotificationMutation = useMutation({
     mutationFn: (id: string) => deleteNotification(id),
     onSuccess: () => {
@@ -126,56 +120,48 @@ const Notifications = () => {
     },
   });
 
-  // Reset form
   const resetForm = () => {
     setFormData({
       recipient: "",
       content: "",
       media_url: "",
       instance_id: "default",
-      status: "pending"
+      status: "pending" as "pending" | "sent" | "failed"
     });
     setCurrentNotification(null);
     setRecipientType("individual");
     setSelectedGroup("");
   };
 
-  // Handle view notification details
   const handleView = (notification: WhatsAppNotification) => {
     setCurrentNotification(notification);
     setIsViewDialogOpen(true);
   };
 
-  // Handle resend notification
   const handleResend = (notification: WhatsAppNotification) => {
     if (notification.status === "failed") {
       updateNotificationMutation.mutate({ id: notification.id });
     }
   };
 
-  // Handle delete notification
   const handleDelete = (notification: WhatsAppNotification) => {
     setCurrentNotification(notification);
     setIsDeleteDialogOpen(true);
   };
 
-  // Handle form input change
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
 
-  // Handle recipient type change
   const handleRecipientTypeChange = (value: string) => {
     setRecipientType(value as "individual" | "group");
     setFormData({ ...formData, recipient: "" });
   };
 
-  // Handle group selection change
   const handleGroupChange = (value: string) => {
     setSelectedGroup(value);
     
-    // Prepare comma-separated list of student WhatsApp numbers in this group
     const studentsInGroup = students
       .filter(student => student.group === value && student.active)
       .map(student => student.whatsappNumber);
@@ -183,12 +169,10 @@ const Notifications = () => {
     setFormData({ ...formData, recipient: studentsInGroup.join(",") });
   };
 
-  // Handle individual recipient selection
   const handleRecipientChange = (value: string) => {
     setFormData({ ...formData, recipient: value });
   };
 
-  // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -202,10 +186,17 @@ const Notifications = () => {
       return;
     }
     
-    addNotificationMutation.mutate(formData);
+    const notification: Omit<WhatsAppNotification, "id" | "createdAt" | "sentAt"> = {
+      recipient: formData.recipient || "",
+      content: formData.content || "",
+      media_url: formData.media_url || "",
+      instance_id: formData.instance_id || "default",
+      status: formData.status || "pending" as "pending" | "sent" | "failed"
+    };
+    
+    addNotificationMutation.mutate(notification);
   };
 
-  // Filter notifications based on search term and status
   const filteredNotifications = notifications.filter((notification) => {
     const matchesSearchTerm =
       notification.recipient.includes(searchTerm) ||
@@ -216,7 +207,6 @@ const Notifications = () => {
     return matchesSearchTerm && matchesStatus;
   });
 
-  // Get notification status display
   const getStatusDisplay = (status: string) => {
     switch (status) {
       case "pending":
@@ -245,7 +235,6 @@ const Notifications = () => {
     }
   };
 
-  // Get unique student groups for the dropdown
   const uniqueGroups = [...new Set(students.map(student => student.group))];
 
   return (
@@ -360,7 +349,6 @@ const Notifications = () => {
         </CardContent>
       </Card>
 
-      {/* Add Notification Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
@@ -471,7 +459,6 @@ const Notifications = () => {
         </DialogContent>
       </Dialog>
 
-      {/* View Notification Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
@@ -536,7 +523,6 @@ const Notifications = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>

@@ -9,7 +9,11 @@ import {
   Donation,
   Event,
   WhatsAppNotification,
-  User
+  User,
+  PaymentType,
+  PaymentStatus,
+  ExpenseStatus,
+  DonationStatus
 } from "@/types";
 import { toast } from "sonner";
 
@@ -20,9 +24,9 @@ const handleError = (error: Error, customMessage: string) => {
   throw error;
 };
 
-// Generic function to fetch data
+// Generic function to fetch data (using explicit table names instead of generic string)
 const fetchData = async <T>(
-  tableName: string,
+  tableName: "students" | "payments" | "expenses" | "teachers" | "staff" | "donations" | "events" | "whatsapp_notifications" | "users",
   orderBy?: string,
   ascending: boolean = true,
   whereClause?: { column: string; value: any }
@@ -89,7 +93,7 @@ export const fetchStudents = async (): Promise<Student[]> => {
   }
 };
 
-export const createStudent = async (student: Omit<Student, "id">): Promise<Student | null> => {
+export const createStudent = async (student: Omit<Student, "id" | "registrationDate" | "updatedAt">): Promise<Student | null> => {
   try {
     // Convert from camelCase to snake_case for database
     const dbStudent = {
@@ -202,6 +206,25 @@ export const updateStudent = async (id: string, student: Partial<Student>): Prom
   }
 };
 
+// Add the missing deleteStudent function
+export const deleteStudent = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from("students")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      throw error;
+    }
+
+    return true;
+  } catch (error) {
+    handleError(error as Error, `ছাত্র মুছতে সমস্যা হয়েছে`);
+    return false;
+  }
+};
+
 // Payments
 export const fetchPayments = async (): Promise<Payment[]> => {
   try {
@@ -220,9 +243,9 @@ export const fetchPayments = async (): Promise<Payment[]> => {
       studentName: item.students?.name || "",
       amount: item.amount,
       date: item.date,
-      type: item.type,
+      type: item.type as PaymentType, // Add type assertion
       description: item.description,
-      status: item.status,
+      status: item.status as PaymentStatus, // Add type assertion
       acceptedBy: item.accepted_by,
       verifiedBy: item.verified_by,
       createdAt: item.created_at,
@@ -263,9 +286,9 @@ export const createPayment = async (payment: Omit<Payment, "id" | "createdAt" | 
       studentName: data.students?.name || "",
       amount: data.amount,
       date: data.date,
-      type: data.type,
+      type: data.type as PaymentType,
       description: data.description,
-      status: data.status,
+      status: data.status as PaymentStatus,
       acceptedBy: data.accepted_by,
       verifiedBy: data.verified_by,
       createdAt: data.created_at,
@@ -274,6 +297,70 @@ export const createPayment = async (payment: Omit<Payment, "id" | "createdAt" | 
   } catch (error) {
     handleError(error as Error, `পেমেন্ট যোগ করতে সমস্যা হয়েছে`);
     return null;
+  }
+};
+
+// Add the missing updatePayment function
+export const updatePayment = async (id: string, payment: Partial<Payment>): Promise<Payment | null> => {
+  try {
+    const dbPayment: Record<string, any> = {};
+    
+    if (payment.studentId !== undefined) dbPayment.student_id = payment.studentId;
+    if (payment.amount !== undefined) dbPayment.amount = payment.amount;
+    if (payment.date !== undefined) dbPayment.date = payment.date;
+    if (payment.type !== undefined) dbPayment.type = payment.type;
+    if (payment.description !== undefined) dbPayment.description = payment.description;
+    if (payment.status !== undefined) dbPayment.status = payment.status;
+    if (payment.acceptedBy !== undefined) dbPayment.accepted_by = payment.acceptedBy;
+    if (payment.verifiedBy !== undefined) dbPayment.verified_by = payment.verifiedBy;
+
+    const { data, error } = await supabase
+      .from("payments")
+      .update(dbPayment)
+      .eq("id", id)
+      .select("*, students(name)")
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return {
+      id: data.id,
+      studentId: data.student_id,
+      studentName: data.students?.name || "",
+      amount: data.amount,
+      date: data.date,
+      type: data.type as PaymentType,
+      description: data.description,
+      status: data.status as PaymentStatus,
+      acceptedBy: data.accepted_by,
+      verifiedBy: data.verified_by,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
+  } catch (error) {
+    handleError(error as Error, `পেমেন্ট আপডেট করতে সমস্যা হয়েছে`);
+    return null;
+  }
+};
+
+// Add the missing deletePayment function
+export const deletePayment = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from("payments")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      throw error;
+    }
+
+    return true;
+  } catch (error) {
+    handleError(error as Error, `পেমেন্ট মুছতে সমস্যা হয়েছে`);
+    return false;
   }
 };
 
@@ -294,10 +381,10 @@ export const fetchExpenses = async (): Promise<Expense[]> => {
       title: item.title,
       amount: item.amount,
       date: item.date,
-      category: item.category,
+      category: item.category as ExpenseCategory,
       subcategory: item.subcategory,
       description: item.description,
-      status: item.status,
+      status: item.status as ExpenseStatus,
       paymentMethod: item.payment_method,
       receiptUrl: item.receipt_url,
       createdBy: item.created_by,
@@ -342,10 +429,10 @@ export const createExpense = async (expense: Omit<Expense, "id" | "createdAt" | 
       title: data.title,
       amount: data.amount,
       date: data.date,
-      category: data.category,
+      category: data.category as ExpenseCategory,
       subcategory: data.subcategory,
       description: data.description,
-      status: data.status,
+      status: data.status as ExpenseStatus,
       paymentMethod: data.payment_method,
       receiptUrl: data.receipt_url,
       createdBy: data.created_by,
@@ -436,7 +523,7 @@ export const fetchDonations = async (): Promise<Donation[]> => {
       amount: item.amount,
       date: item.date,
       description: item.description || "",
-      status: item.status,
+      status: item.status as DonationStatus,
       createdBy: item.created_by,
       createdAt: item.created_at
     }));
@@ -490,9 +577,9 @@ export const fetchNotifications = async (): Promise<WhatsAppNotification[]> => {
       id: item.id,
       recipient: item.recipient,
       content: item.content,
-      mediaUrl: item.media_url || "",
-      status: item.status,
-      instanceId: item.instance_id,
+      media_url: item.media_url || "",
+      status: item.status as "pending" | "sent" | "failed",
+      instance_id: item.instance_id,
       sentAt: item.sent_at,
       createdAt: item.created_at
     }));
@@ -507,9 +594,9 @@ export const createNotification = async (notification: Omit<WhatsAppNotification
     const dbNotification = {
       recipient: notification.recipient,
       content: notification.content,
-      media_url: notification.mediaUrl,
-      status: notification.status,
-      instance_id: notification.instanceId
+      media_url: notification.media_url,
+      status: notification.status as "pending" | "sent" | "failed",
+      instance_id: notification.instance_id
     };
 
     const { data, error } = await supabase
@@ -526,9 +613,9 @@ export const createNotification = async (notification: Omit<WhatsAppNotification
       id: data.id,
       recipient: data.recipient,
       content: data.content,
-      mediaUrl: data.media_url || "",
-      status: data.status,
-      instanceId: data.instance_id,
+      media_url: data.media_url || "",
+      status: data.status as "pending" | "sent" | "failed",
+      instance_id: data.instance_id,
       sentAt: data.sent_at,
       createdAt: data.created_at
     };
@@ -544,9 +631,9 @@ export const updateNotification = async (id: string, updates: Partial<WhatsAppNo
     
     if (updates.recipient !== undefined) dbUpdates.recipient = updates.recipient;
     if (updates.content !== undefined) dbUpdates.content = updates.content;
-    if (updates.mediaUrl !== undefined) dbUpdates.media_url = updates.mediaUrl;
+    if (updates.media_url !== undefined) dbUpdates.media_url = updates.media_url;
     if (updates.status !== undefined) dbUpdates.status = updates.status;
-    if (updates.instanceId !== undefined) dbUpdates.instance_id = updates.instanceId;
+    if (updates.instance_id !== undefined) dbUpdates.instance_id = updates.instance_id;
     if (updates.sentAt !== undefined) dbUpdates.sent_at = updates.sentAt;
 
     const { data, error } = await supabase
@@ -564,9 +651,9 @@ export const updateNotification = async (id: string, updates: Partial<WhatsAppNo
       id: data.id,
       recipient: data.recipient,
       content: data.content,
-      mediaUrl: data.media_url || "",
-      status: data.status,
-      instanceId: data.instance_id,
+      media_url: data.media_url || "",
+      status: data.status as "pending" | "sent" | "failed",
+      instance_id: data.instance_id,
       sentAt: data.sent_at,
       createdAt: data.created_at
     };
