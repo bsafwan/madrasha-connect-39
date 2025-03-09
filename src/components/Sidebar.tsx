@@ -12,6 +12,20 @@ import {
   Settings,
   UserCircle,
   Bell,
+  Calendar,
+  GraduationCap,
+  UserCog,
+  CalendarClock,
+  BookText,
+  BookOpenText,
+  Timer,
+  BookMarked,
+  TrendingUp,
+  HeartHandshake,
+  DollarSign,
+  Receipt,
+  FileBox,
+  Landmark
 } from "lucide-react";
 
 interface SidebarItemProps {
@@ -80,6 +94,54 @@ const Sidebar = () => {
             active={location.pathname.startsWith("/students")}
           />
           <SidebarItem
+            icon={<GraduationCap />}
+            label="শিক্ষকগণ"
+            href="/teachers"
+            active={location.pathname.startsWith("/teachers")}
+          />
+          <SidebarItem
+            icon={<UserCog />}
+            label="কর্মচারীগণ"
+            href="/staff"
+            active={location.pathname.startsWith("/staff")}
+          />
+          <SidebarItem
+            icon={<CalendarClock />}
+            label="উপস্থিতি"
+            href="/attendance"
+            active={location.pathname.startsWith("/attendance")}
+          />
+          <SidebarItem
+            icon={<BookText />}
+            label="পাঠ্যক্রম"
+            href="/curriculum"
+            active={location.pathname.startsWith("/curriculum")}
+          />
+          <SidebarItem
+            icon={<BookOpenText />}
+            label="সিলেবাস"
+            href="/syllabus"
+            active={location.pathname.startsWith("/syllabus")}
+          />
+          <SidebarItem
+            icon={<Timer />}
+            label="সময়সূচি"
+            href="/timetable"
+            active={location.pathname.startsWith("/timetable")}
+          />
+          <SidebarItem
+            icon={<BookMarked />}
+            label="পরীক্ষা"
+            href="/exams"
+            active={location.pathname.startsWith("/exams")}
+          />
+          <SidebarItem
+            icon={<TrendingUp />}
+            label="কোরআন প্রোগ্রেস"
+            href="/progress"
+            active={location.pathname.startsWith("/progress")}
+          />
+          <SidebarItem
             icon={<CreditCard />}
             label="পেমেন্ট"
             href="/payments"
@@ -92,10 +154,40 @@ const Sidebar = () => {
             active={location.pathname.startsWith("/expenses")}
           />
           <SidebarItem
+            icon={<HeartHandshake />}
+            label="অনুদান"
+            href="/donations"
+            active={location.pathname.startsWith("/donations")}
+          />
+          <SidebarItem
+            icon={<DollarSign />}
+            label="বেতন"
+            href="/salaries"
+            active={location.pathname.startsWith("/salaries")}
+          />
+          <SidebarItem
+            icon={<Receipt />}
+            label="ফি সম্পর্কিত"
+            href="/fees"
+            active={location.pathname.startsWith("/fees")}
+          />
+          <SidebarItem
             icon={<BookOpen />}
             label="গ্রুপ ব্যবস্থাপনা"
             href="/groups"
             active={location.pathname.startsWith("/groups")}
+          />
+          <SidebarItem
+            icon={<FileBox />}
+            label="শিক্ষা উপকরণ"
+            href="/materials"
+            active={location.pathname.startsWith("/materials")}
+          />
+          <SidebarItem
+            icon={<Calendar />}
+            label="ইভেন্ট"
+            href="/events"
+            active={location.pathname.startsWith("/events")}
           />
           <SidebarItem
             icon={<Bell />}

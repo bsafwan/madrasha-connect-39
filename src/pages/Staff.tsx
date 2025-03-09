@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { fetchStaff } from "@/services/dataService";
+import { formatCurrency } from "@/integrations/supabase/client";
 import {
   Table,
   TableBody,
@@ -18,6 +19,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { PlusCircle } from "lucide-react";
 
 const Staff = () => {
   const { data: staffMembers = [], isLoading } = useQuery({
@@ -29,6 +32,9 @@ const Staff = () => {
     <div className="space-y-6 page-transition">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-2xl font-semibold tracking-tight">কর্মচারীগণ</h2>
+        <Button className="btn-primary">
+          <PlusCircle className="mr-2 h-4 w-4" /> নতুন কর্মচারী যোগ করুন
+        </Button>
       </div>
 
       <Card>
@@ -65,7 +71,7 @@ const Staff = () => {
                       <TableCell className="font-medium">{staff.name}</TableCell>
                       <TableCell>{staff.position}</TableCell>
                       <TableCell>{staff.phone}</TableCell>
-                      <TableCell>{staff.salary}</TableCell>
+                      <TableCell>{formatCurrency(staff.salary)}</TableCell>
                       <TableCell>
                         {staff.active ? (
                           <span className="text-green-600">সক্রিয়</span>
