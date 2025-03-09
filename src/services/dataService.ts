@@ -43,7 +43,26 @@ export const fetchStudents = async () => {
       throw error;
     }
 
-    return data as Student[];
+    // Transform the database response to match our Student type
+    return data.map(item => ({
+      id: item.id,
+      name: item.name,
+      fatherName: item.father_name,
+      motherName: item.mother_name,
+      whatsappNumber: item.whatsapp_number,
+      address: item.address,
+      group: item.group_name,
+      monthlyFee: item.monthly_fee,
+      registrationDate: item.registration_date,
+      active: item.active,
+      guardianPhone: item.guardian_phone,
+      emergencyContact: item.emergency_contact,
+      birthDate: item.birth_date,
+      enrollmentNumber: item.enrollment_number,
+      previousEducation: item.previous_education,
+      medicalInfo: item.medical_info,
+      updatedAt: item.updated_at
+    })) as Student[];
   } catch (error) {
     handleError(error as Error, `ডাটা লোড করতে সমস্যা হয়েছে`);
     return [];
