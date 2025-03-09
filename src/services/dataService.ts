@@ -519,7 +519,8 @@ export const fetchDonations = async (): Promise<Donation[]> => {
       date: item.date,
       description: item.description || "",
       status: item.status as DonationStatus,
-      createdBy: item.created_by
+      createdBy: item.created_by,
+      createdAt: item.created_at // Add the missing createdAt property
     }));
   } catch (error) {
     handleError(error as Error, `দানের ডাটা লোড করতে সমস্যা হয়েছে`);
