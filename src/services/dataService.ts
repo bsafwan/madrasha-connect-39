@@ -22,7 +22,27 @@ const handleError = (error: Error, customMessage: string) => {
   throw error;
 };
 
-type TableName = "students" | "payments" | "expenses" | "teachers" | "staff" | "donations" | "events" | "whatsapp_notifications" | "users";
+// Define a union type of all valid table names
+type TableName = 
+  | 'students' 
+  | 'teachers' 
+  | 'staff' 
+  | 'users' 
+  | 'attendance' 
+  | 'exams' 
+  | 'curriculum' 
+  | 'materials'
+  | 'donations'
+  | 'expenses'
+  | 'payments'
+  | 'fees'
+  | 'salaries'
+  | 'events'
+  | 'notifications'
+  | 'groups'
+  | 'progress'
+  | 'syllabus'
+  | 'timetable';
 
 const fetchData = async <T>(
   tableName: TableName,
