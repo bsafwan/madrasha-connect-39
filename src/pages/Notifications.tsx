@@ -321,8 +321,8 @@ const Notifications = () => {
                         {notification.content}
                       </TableCell>
                       <TableCell>
-                        {notification.sent_at 
-                          ? formatDateBengali(notification.sent_at)
+                        {notification.sentAt 
+                          ? formatDateBengali(notification.sentAt)
                           : "পাঠানো হয়নি"}
                       </TableCell>
                       <TableCell>{getStatusDisplay(notification.status)}</TableCell>
@@ -500,8 +500,8 @@ const Notifications = () => {
             <div className="grid grid-cols-4 items-center gap-2">
               <div className="font-medium">সময়:</div>
               <div className="col-span-3">
-                {currentNotification?.sent_at 
-                  ? formatDateBengali(currentNotification.sent_at)
+                {currentNotification?.sentAt 
+                  ? formatDateBengali(currentNotification.sentAt)
                   : "পাঠানো হয়নি"}
               </div>
             </div>
