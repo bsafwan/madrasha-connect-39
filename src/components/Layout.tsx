@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, Route, Routes, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,29 @@ import { cn } from "@/lib/utils";
 // Import components
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
+import Dashboard from "@/pages/Dashboard";
+import Students from "@/pages/Students";
+import Teachers from "@/pages/Teachers";
+import Staff from "@/pages/Staff";
+import Attendance from "@/pages/Attendance";
+import Curriculum from "@/pages/Curriculum";
+import Syllabus from "@/pages/Syllabus";
+import Timetable from "@/pages/Timetable";
+import Exams from "@/pages/Exams";
+import Progress from "@/pages/Progress";
+import Payments from "@/pages/Payments";
+import Expenses from "@/pages/Expenses";
+import Donations from "@/pages/Donations";
+import Salaries from "@/pages/Salaries";
+import Fees from "@/pages/Fees";
+import Groups from "@/pages/Groups";
+import Materials from "@/pages/Materials";
+import Events from "@/pages/Events";
+import Notifications from "@/pages/Notifications";
+import Users from "@/pages/Users";
+import Settings from "@/pages/Settings";
+import NotFound from "@/pages/NotFound";
+import Index from "@/pages/Index";
 
 export default function Layout() {
   const { user } = useAuth();
@@ -21,7 +44,7 @@ export default function Layout() {
     }
   }, [user, navigate]);
 
-  if (!user) return null;
+  if (!user) return <Index />;
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -62,7 +85,31 @@ export default function Layout() {
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 bg-background">
           <div className="mx-auto w-full max-w-7xl">
-            <Outlet />
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/students" element={<Students />} />
+              <Route path="/teachers" element={<Teachers />} />
+              <Route path="/staff" element={<Staff />} />
+              <Route path="/attendance" element={<Attendance />} />
+              <Route path="/curriculum" element={<Curriculum />} />
+              <Route path="/syllabus" element={<Syllabus />} />
+              <Route path="/timetable" element={<Timetable />} />
+              <Route path="/exams" element={<Exams />} />
+              <Route path="/progress" element={<Progress />} />
+              <Route path="/payments" element={<Payments />} />
+              <Route path="/expenses" element={<Expenses />} />
+              <Route path="/donations" element={<Donations />} />
+              <Route path="/salaries" element={<Salaries />} />
+              <Route path="/fees" element={<Fees />} />
+              <Route path="/groups" element={<Groups />} />
+              <Route path="/materials" element={<Materials />} />
+              <Route path="/events" element={<Events />} />
+              <Route path="/notifications" element={<Notifications />} />
+              <Route path="/users" element={<Users />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
           </div>
         </main>
       </div>
