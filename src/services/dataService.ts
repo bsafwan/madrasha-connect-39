@@ -801,3 +801,74 @@ export const fetchUsers = async (): Promise<User[]> => {
     return [];
   }
 };
+
+export const createUser = async (user: User): Promise<User | null> => {
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .insert({
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        password: user.password
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return data as User;
+  } catch (error) {
+    handleError(error as Error, `ইউজার তৈরি করতে সমস্যা হয়েছে`);
+    return null;
+  }
+};
+
+export const updateUser = async (id: string, user: Partial<User>): Promise<User | null> => {
+  try {
+    const updates: Record<string, any> = {};
+    
+    if (user.name !== undefined) updates.name = user.name;
+    if (user.email !== undefined) updates.email = user.email;
+    if (user.phone !== undefined) updates.phone = user.phone;
+    if (user.role !== undefined) updates.role = user.role;
+    if (user.password !== undefined) updates.password = user.password;
+
+    const { data, error } = await supabase
+      .from("users")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return data as User;
+  } catch (error) {
+    handleError(error as Error, `ইউজার আপডেট করতে সমস্যা হয়েছে`);
+    return null;
+  }
+};
+
+export const deleteUser = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from("users")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      throw error;
+    }
+
+    return true;
+  } catch (error) {
+    handleError(error as Error, `ইউজার মুছতে সমস্যা হয়েছে`);
+    return false;
+  }
+};

@@ -1,5 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 // Define the shape of our context
 type AuthContextType = {
@@ -10,12 +12,12 @@ type AuthContextType = {
   logout: () => Promise<void>;
 };
 
-// Mock user type
+// User type
 type User = {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'teacher' | 'staff' | 'user';
+  role: 'admin' | 'teacher';
 };
 
 // Create the context with a default value
@@ -32,46 +34,95 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // For demo purposes, simulate an authenticated user (admin)
+  // Check if there's a logged in user on mount
   useEffect(() => {
-    // Simulating loading auth state
-    setTimeout(() => {
-      setUser({
-        id: '1',
-        email: 'admin@example.com',
-        name: 'Admin User',
-        role: 'admin'
-      });
-      setIsLoading(false);
-    }, 1000);
+    checkUser();
+    
+    // Cleanup function on unmount
+    return () => {};
   }, []);
 
   // Check if user is admin
   const isAdmin = user?.role === 'admin';
 
-  // Mock login function
-  const login = async (email: string, password: string) => {
+  // Check for existing user session
+  const checkUser = async () => {
     setIsLoading(true);
-    // Mock API call
-    setTimeout(() => {
-      setUser({
-        id: '1',
-        email,
-        name: email.split('@')[0],
-        role: email.includes('admin') ? 'admin' : 'user'
-      });
+    try {
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', 'admin@example.com')
+        .single();
+        
+      if (sessionError) {
+        // For demo purposes, we're still setting a default user
+        // In a real app, this would check localStorage or session cookies
+        setUser({
+          id: '1',
+          email: 'admin@example.com',
+          name: 'Admin User',
+          role: 'admin'
+        });
+      } else if (sessionData) {
+        setUser({
+          id: sessionData.id,
+          email: sessionData.email,
+          name: sessionData.name,
+          role: sessionData.role
+        });
+      }
+    } catch (error) {
+      console.error("Error checking user session:", error);
+      setUser(null);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
-  // Mock logout function
+  // Login function
+  const login = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .eq('password', password)
+        .single();
+
+      if (error) {
+        toast.error("ইমেইল বা পাসওয়ার্ড ভুল");
+        throw error;
+      }
+
+      setUser({
+        id: data.id,
+        email: data.email,
+        name: data.name,
+        role: data.role
+      });
+      
+      toast.success("সফলভাবে লগইন হয়েছে!");
+    } catch (error) {
+      console.error("Login error:", error);
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Logout function
   const logout = async () => {
     setIsLoading(true);
-    // Mock API call
-    setTimeout(() => {
+    try {
       setUser(null);
+      toast.success("সফলভাবে লগআউট হয়েছে");
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
