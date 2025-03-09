@@ -22,28 +22,35 @@ const handleError = (error: Error, customMessage: string) => {
   throw error;
 };
 
-// Define a union type of all valid table names
+// Define a union type of all valid table names that actually exist in the Supabase database
 type TableName = 
   | 'students' 
   | 'teachers' 
   | 'staff' 
   | 'users' 
-  | 'attendance' 
+  | 'student_attendance' 
+  | 'teacher_attendance'
   | 'exams' 
+  | 'exam_results'
   | 'curriculum' 
-  | 'materials'
+  | 'curriculum_items'
+  | 'study_materials'
   | 'donations'
   | 'expenses'
   | 'payments'
-  | 'fees'
-  | 'salaries'
+  | 'fee_structure'
+  | 'teacher_salaries'
+  | 'staff_salaries'
   | 'events'
-  | 'notifications'
-  | 'groups'
-  | 'progress'
+  | 'whatsapp_notifications'
+  | 'student_assessments'
+  | 'quran_progress'
   | 'syllabus'
-  | 'timetable';
+  | 'syllabus_items'
+  | 'timetables'
+  | 'timetable_slots';
 
+// Use a type assertion to ensure TypeScript accepts the string as a valid table name
 const fetchData = async <T>(
   tableName: TableName,
   orderBy?: string,
@@ -51,7 +58,7 @@ const fetchData = async <T>(
   whereClause?: { column: string; value: any }
 ): Promise<T[]> => {
   try {
-    let query = supabase.from(tableName).select("*");
+    let query = supabase.from(tableName as any).select("*");
     
     if (whereClause) {
       query = query.eq(whereClause.column, whereClause.value);
