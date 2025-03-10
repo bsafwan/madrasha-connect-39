@@ -99,20 +99,32 @@ const Groups = () => {
         if (studentsError) throw studentsError;
 
         // Map database fields to our interface
-        const mappedStudents = studentsData?.map((student) => ({
+        const mappedStudents: Student[] = studentsData?.map((student) => ({
           id: student.id,
           name: student.name,
           fatherName: student.father_name,
           motherName: student.mother_name,
+          parentPhone1: student.parent_phone1 || "",
+          parentPhone2: student.parent_phone2 || "",
           whatsappNumber: student.whatsapp_number,
           address: student.address,
           group: student.group_name as StudentGroup,
           monthlyFee: student.monthly_fee,
           registrationDate: student.registration_date,
           active: student.active,
-        }));
+          resigned: student.resigned || false,
+          assignedTeacherId: student.assigned_teacher_id || "",
+          updatedAt: student.updated_at,
+          guardianPhone: student.guardian_phone || "",
+          emergencyContact: student.emergency_contact || "",
+          birthDate: student.birth_date || "",
+          enrollmentNumber: student.enrollment_number || "",
+          previousEducation: student.previous_education || "",
+          medicalInfo: student.medical_info || "",
+          resignDate: student.resign_date || "",
+        })) || [];
 
-        setStudents(mappedStudents || []);
+        setStudents(mappedStudents);
 
         // Calculate stats
         const stats = {
