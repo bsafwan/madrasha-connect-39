@@ -97,12 +97,17 @@ export const fetchStudents = async (): Promise<Student[]> => {
       name: item.name,
       fatherName: item.father_name,
       motherName: item.mother_name,
+      parentPhone1: item.parent_phone1 || item.whatsapp_number,
+      parentPhone2: item.parent_phone2,
       whatsappNumber: item.whatsapp_number,
       address: item.address,
       group: item.group_name,
       monthlyFee: item.monthly_fee,
       registrationDate: item.registration_date,
       active: item.active,
+      resigned: item.resigned || false,
+      resignDate: item.resign_date,
+      assignedTeacherId: item.assigned_teacher_id || "",
       guardianPhone: item.guardian_phone,
       emergencyContact: item.emergency_contact,
       birthDate: item.birth_date,
@@ -123,11 +128,16 @@ export const createStudent = async (student: Omit<Student, "id" | "registrationD
       name: student.name,
       father_name: student.fatherName,
       mother_name: student.motherName,
+      parent_phone1: student.parentPhone1,
+      parent_phone2: student.parentPhone2,
       whatsapp_number: student.whatsappNumber,
       address: student.address,
       group_name: student.group,
       monthly_fee: student.monthlyFee,
       active: student.active,
+      resigned: student.resigned,
+      resign_date: student.resignDate,
+      assigned_teacher_id: student.assignedTeacherId,
       guardian_phone: student.guardianPhone,
       emergency_contact: student.emergencyContact,
       birth_date: student.birthDate,
@@ -151,12 +161,17 @@ export const createStudent = async (student: Omit<Student, "id" | "registrationD
       name: data.name,
       fatherName: data.father_name,
       motherName: data.mother_name,
+      parentPhone1: data.parent_phone1 || data.whatsapp_number,
+      parentPhone2: data.parent_phone2,
       whatsappNumber: data.whatsapp_number,
       address: data.address,
       group: data.group_name,
       monthlyFee: data.monthly_fee,
       registrationDate: data.registration_date,
       active: data.active,
+      resigned: data.resigned || false,
+      resignDate: data.resign_date,
+      assignedTeacherId: data.assigned_teacher_id || "",
       guardianPhone: data.guardian_phone,
       emergencyContact: data.emergency_contact,
       birthDate: data.birth_date,
@@ -178,11 +193,16 @@ export const updateStudent = async (id: string, student: Partial<Student>): Prom
     if (student.name !== undefined) dbStudent.name = student.name;
     if (student.fatherName !== undefined) dbStudent.father_name = student.fatherName;
     if (student.motherName !== undefined) dbStudent.mother_name = student.motherName;
+    if (student.parentPhone1 !== undefined) dbStudent.parent_phone1 = student.parentPhone1;
+    if (student.parentPhone2 !== undefined) dbStudent.parent_phone2 = student.parentPhone2;
     if (student.whatsappNumber !== undefined) dbStudent.whatsapp_number = student.whatsappNumber;
     if (student.address !== undefined) dbStudent.address = student.address;
     if (student.group !== undefined) dbStudent.group_name = student.group;
     if (student.monthlyFee !== undefined) dbStudent.monthly_fee = student.monthlyFee;
     if (student.active !== undefined) dbStudent.active = student.active;
+    if (student.resigned !== undefined) dbStudent.resigned = student.resigned;
+    if (student.resignDate !== undefined) dbStudent.resign_date = student.resignDate;
+    if (student.assignedTeacherId !== undefined) dbStudent.assigned_teacher_id = student.assignedTeacherId;
     if (student.guardianPhone !== undefined) dbStudent.guardian_phone = student.guardianPhone;
     if (student.emergencyContact !== undefined) dbStudent.emergency_contact = student.emergencyContact;
     if (student.birthDate !== undefined) dbStudent.birth_date = student.birthDate;
@@ -206,12 +226,17 @@ export const updateStudent = async (id: string, student: Partial<Student>): Prom
       name: data.name,
       fatherName: data.father_name,
       motherName: data.mother_name,
+      parentPhone1: data.parent_phone1 || data.whatsapp_number,
+      parentPhone2: data.parent_phone2,
       whatsappNumber: data.whatsapp_number,
       address: data.address,
       group: data.group_name,
       monthlyFee: data.monthly_fee,
       registrationDate: data.registration_date,
       active: data.active,
+      resigned: data.resigned || false,
+      resignDate: data.resign_date,
+      assignedTeacherId: data.assigned_teacher_id || "",
       guardianPhone: data.guardian_phone,
       emergencyContact: data.emergency_contact,
       birthDate: data.birth_date,
@@ -221,7 +246,7 @@ export const updateStudent = async (id: string, student: Partial<Student>): Prom
       updatedAt: data.updated_at
     };
   } catch (error) {
-    handleError(error as Error, `ছাত্র আপডেট করতে সমস্যা হয়েছে`);
+    handleError(error as Error, `ছাত্রের তথ্য আপডেট করতে সমস্যা হয়েছে`);
     return null;
   }
 };
@@ -827,19 +852,19 @@ export const createUser = async (user: User): Promise<User | null> => {
   }
 };
 
-export const updateUser = async (id: string, user: Partial<User>): Promise<User | null> => {
+export const updateUser = async (id: string, updates: Partial<User>): Promise<User | null> => {
   try {
-    const updates: Record<string, any> = {};
+    const dbUpdates: Record<string, any> = {};
     
-    if (user.name !== undefined) updates.name = user.name;
-    if (user.email !== undefined) updates.email = user.email;
-    if (user.phone !== undefined) updates.phone = user.phone;
-    if (user.role !== undefined) updates.role = user.role;
-    if (user.password !== undefined) updates.password = user.password;
+    if (updates.name !== undefined) dbUpdates.name = updates.name;
+    if (updates.email !== undefined) dbUpdates.email = updates.email;
+    if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
+    if (updates.role !== undefined) dbUpdates.role = updates.role;
+    if (updates.password !== undefined) dbUpdates.password = updates.password;
 
     const { data, error } = await supabase
       .from("users")
-      .update(updates)
+      .update(dbUpdates)
       .eq("id", id)
       .select()
       .single();
@@ -872,3 +897,4 @@ export const deleteUser = async (id: string): Promise<boolean> => {
     return false;
   }
 };
+

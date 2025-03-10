@@ -1,4 +1,3 @@
-
 // User types
 export type UserRole = "admin" | "teacher";
 
@@ -19,19 +18,24 @@ export interface Student {
   name: string;
   fatherName: string;
   motherName: string;
-  whatsappNumber: string;
-  address: string;
-  group: StudentGroup;
+  parentPhone1: string; // Format: countryCode + number without symbols
+  parentPhone2?: string; // Optional second parent number
+  whatsappNumber?: string; // Keep existing WhatsApp number
+  address?: string; // Made optional as requested
+  group: string;
   monthlyFee: number;
   registrationDate: string; // ISO date string
   active: boolean;
+  resigned: boolean; // New field to track resignation status
+  resignDate?: string; // Date when student resigned
+  assignedTeacherId: string; // Teacher assigned to this student
+  updatedAt: string;
   guardianPhone?: string;
   emergencyContact?: string;
   birthDate?: string; // ISO date string
   enrollmentNumber?: string;
   previousEducation?: string;
   medicalInfo?: string;
-  updatedAt?: string; // ISO date string
 }
 
 // Payment types

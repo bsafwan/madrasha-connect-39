@@ -3,6 +3,9 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+// Define role type to enforce proper values
+type UserRole = 'admin' | 'teacher';
+
 // Define the shape of our context
 type AuthContextType = {
   user: User | null;
@@ -17,7 +20,7 @@ type User = {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'teacher';
+  role: UserRole;
 };
 
 // Create the context with a default value
@@ -65,11 +68,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           role: 'admin'
         });
       } else if (sessionData) {
+        // Make sure the role is properly typed
+        const role: UserRole = sessionData.role === 'teacher' ? 'teacher' : 'admin';
+        
         setUser({
           id: sessionData.id,
           email: sessionData.email,
           name: sessionData.name,
-          role: sessionData.role
+          role: role
         });
       }
     } catch (error) {
@@ -96,11 +102,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw error;
       }
 
+      // Make sure the role is properly typed
+      const role: UserRole = data.role === 'teacher' ? 'teacher' : 'admin';
+
       setUser({
         id: data.id,
         email: data.email,
         name: data.name,
-        role: data.role
+        role: role
       });
       
       toast.success("সফলভাবে লগইন হয়েছে!");

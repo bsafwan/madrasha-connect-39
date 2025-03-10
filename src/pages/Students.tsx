@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -26,6 +27,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,62 +53,70 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchStudents, createStudent, updateStudent, deleteStudent } from "@/services/dataService";
+import { fetchStudents, createStudent, updateStudent, deleteStudent, fetchTeachers } from "@/services/dataService";
 import { formatDateBengali, toBengaliNumber } from "@/integrations/supabase/client";
-import { Student } from "@/types";
-import { Plus, Edit, Trash2, Search, Filter, User, Phone, Home, Book, Coins } from "lucide-react";
+import { Student, Teacher } from "@/types";
+import { Plus, Edit, Trash2, Search, Filter, User, Phone, Home, Book, Coins, X, ArrowUpDown } from "lucide-react";
+import PhoneInput from "@/components/PhoneInput";
 
 const Students = () => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isResignDialogOpen, setIsResignDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterGroup, setFilterGroup] = useState("");
+  const [filterTeacher, setFilterTeacher] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [sortField, setSortField] = useState("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
   const [formData, setFormData] = useState<Partial<Student>>({
     name: "",
     fatherName: "",
     motherName: "",
+    parentPhone1: "",
+    parentPhone2: "",
     whatsappNumber: "",
     address: "",
     group: "hifz",
     monthlyFee: 500,
     active: true,
+    resigned: false,
+    assignedTeacherId: "",
   });
 
   // Fetch all students
-  const { data: students = [], isLoading } = useQuery({
+  const { data: students = [], isLoading: isLoadingStudents } = useQuery({
     queryKey: ["students"],
     queryFn: fetchStudents,
   });
 
+  // Fetch all teachers for assignment
+  const { data: teachers = [], isLoading: isLoadingTeachers } = useQuery({
+    queryKey: ["teachers"],
+    queryFn: fetchTeachers,
+  });
+
+  // Filter out admin users from the teachers list for assignment
+  const availableTeachers = teachers.filter(teacher => teacher.active);
+
   // Add student mutation
   const addStudentMutation = useMutation({
     mutationFn: (studentData: Omit<Student, "id" | "registrationDate" | "updatedAt">) => {
-      const student: Omit<Student, "id" | "registrationDate" | "updatedAt"> = {
-        name: studentData.name,
-        fatherName: studentData.fatherName,
-        motherName: studentData.motherName,
-        whatsappNumber: studentData.whatsappNumber,
-        address: studentData.address,
-        group: studentData.group,
-        monthlyFee: studentData.monthlyFee,
-        active: studentData.active,
-        guardianPhone: studentData.guardianPhone,
-        emergencyContact: studentData.emergencyContact,
-        birthDate: studentData.birthDate,
-        enrollmentNumber: studentData.enrollmentNumber,
-        previousEducation: studentData.previousEducation,
-        medicalInfo: studentData.medicalInfo
-      };
-      return createStudent(student);
+      return createStudent(studentData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["students"] });
       setIsAddDialogOpen(false);
       resetForm();
+      toast.success("ছাত্র সফলভাবে যোগ করা হয়েছে");
+    },
+    onError: (error) => {
+      console.error("Error adding student:", error);
+      toast.error("ছাত্র যোগ করতে সমস্যা হয়েছে");
     },
   });
 
@@ -106,7 +126,13 @@ const Students = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["students"] });
       setIsEditDialogOpen(false);
+      setIsResignDialogOpen(false);
       resetForm();
+      toast.success("ছাত্রের তথ্য সফলভাবে হালনাগাদ করা হয়েছে");
+    },
+    onError: (error) => {
+      console.error("Error updating student:", error);
+      toast.error("ছাত্রের তথ্য হালনাগাদ করতে সমস্যা হয়েছে");
     },
   });
 
@@ -116,6 +142,11 @@ const Students = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["students"] });
       setIsDeleteDialogOpen(false);
+      toast.success("ছাত্র সফলভাবে মুছে ফেলা হয়েছে");
+    },
+    onError: (error) => {
+      console.error("Error deleting student:", error);
+      toast.error("ছাত্র মুছতে সমস্যা হয়েছে");
     },
   });
 
@@ -125,28 +156,41 @@ const Students = () => {
       name: "",
       fatherName: "",
       motherName: "",
+      parentPhone1: "",
+      parentPhone2: "",
       whatsappNumber: "",
       address: "",
       group: "hifz",
       monthlyFee: 500,
       active: true,
+      resigned: false,
+      assignedTeacherId: "",
     });
     setCurrentStudent(null);
   };
 
   // Handle edit button click
   const handleEdit = (student: Student) => {
+    if (!isAdmin) {
+      toast.error("শুধুমাত্র অ্যাডমিন ছাত্রের তথ্য সম্পাদনা করতে পারেন");
+      return;
+    }
+    
     setCurrentStudent(student);
     setFormData({
       id: student.id,
       name: student.name,
       fatherName: student.fatherName,
       motherName: student.motherName,
-      whatsappNumber: student.whatsappNumber,
-      address: student.address,
+      parentPhone1: student.parentPhone1 || "",
+      parentPhone2: student.parentPhone2 || "",
+      whatsappNumber: student.whatsappNumber || "",
+      address: student.address || "",
       group: student.group,
       monthlyFee: student.monthlyFee,
       active: student.active,
+      resigned: student.resigned || false,
+      assignedTeacherId: student.assignedTeacherId || "",
       guardianPhone: student.guardianPhone,
       emergencyContact: student.emergencyContact,
       birthDate: student.birthDate,
@@ -157,8 +201,30 @@ const Students = () => {
     setIsEditDialogOpen(true);
   };
 
+  // Handle resign button click
+  const handleResign = (student: Student) => {
+    if (!isAdmin) {
+      toast.error("শুধুমাত্র অ্যাডমিন ছাত্রকে অবসর দিতে পারেন");
+      return;
+    }
+    
+    setCurrentStudent(student);
+    setFormData({
+      id: student.id,
+      resigned: true,
+      resignDate: new Date().toISOString().split('T')[0],
+      active: false,
+    });
+    setIsResignDialogOpen(true);
+  };
+
   // Handle delete button click
   const handleDelete = (student: Student) => {
+    if (!isAdmin) {
+      toast.error("শুধুমাত্র অ্যাডমিন ছাত্র মুছতে পারেন");
+      return;
+    }
+    
     setCurrentStudent(student);
     setIsDeleteDialogOpen(true);
   };
@@ -173,19 +239,43 @@ const Students = () => {
     }
   };
 
+  // Handle phone number change
+  const handlePhoneChange = (name: string, value: string) => {
+    setFormData({ ...formData, [name]: value });
+  };
+
   // Handle checkbox change
-  const handleCheckboxChange = (checked: boolean) => {
-    setFormData({ ...formData, active: checked });
+  const handleCheckboxChange = (name: string, checked: boolean) => {
+    setFormData({ ...formData, [name]: checked });
   };
 
   // Handle select change
-  const handleSelectChange = (value: string) => {
-    setFormData({ ...formData, group: value });
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData({ ...formData, [name]: value });
   };
 
   // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!formData.name || !formData.fatherName || !formData.motherName || !formData.parentPhone1 || !formData.assignedTeacherId) {
+      toast.error("সব প্রয়োজনীয় ক্ষেত্র পূরণ করুন");
+      return;
+    }
+    
+    // Validate phone number format
+    const phoneRegex = /^\d+$/;
+    if (!phoneRegex.test(formData.parentPhone1 || "")) {
+      toast.error("অবৈধ ফোন নম্বর ফরম্যাট। শুধুমাত্র সংখ্যা ব্যবহার করুন, কোনো বিশেষ চিহ্ন বা ফাঁকা স্থান নয়");
+      return;
+    }
+    
+    if (formData.parentPhone2 && !phoneRegex.test(formData.parentPhone2)) {
+      toast.error("অবৈধ দ্বিতীয় ফোন নম্বর ফরম্যাট। শুধুমাত্র সংখ্যা ব্যবহার করুন");
+      return;
+    }
+
     if (currentStudent) {
       updateStudentMutation.mutate({ 
         id: currentStudent.id,
@@ -196,11 +286,15 @@ const Students = () => {
         name: formData.name || "",
         fatherName: formData.fatherName || "",
         motherName: formData.motherName || "",
-        whatsappNumber: formData.whatsappNumber || "",
-        address: formData.address || "",
+        parentPhone1: formData.parentPhone1 || "",
+        parentPhone2: formData.parentPhone2,
+        whatsappNumber: formData.whatsappNumber,
+        address: formData.address,
         group: formData.group || "hifz",
         monthlyFee: formData.monthlyFee || 500,
         active: formData.active === undefined ? true : formData.active,
+        resigned: formData.resigned || false,
+        assignedTeacherId: formData.assignedTeacherId || "",
         guardianPhone: formData.guardianPhone,
         emergencyContact: formData.emergencyContact,
         birthDate: formData.birthDate,
@@ -212,28 +306,99 @@ const Students = () => {
     }
   };
 
-  // Filter students based on search term and group
-  const filteredStudents = students.filter((student) => {
+  // Handle resign confirmation
+  const handleResignConfirm = () => {
+    if (currentStudent) {
+      updateStudentMutation.mutate({
+        id: currentStudent.id,
+        data: {
+          resigned: true,
+          resignDate: new Date().toISOString().split('T')[0],
+          active: false
+        }
+      });
+    }
+  };
+
+  // Handle sorting
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  // Apply sorting to students
+  const sortedStudents = [...students].sort((a, b) => {
+    let valueA: any;
+    let valueB: any;
+
+    // Extract values based on the field
+    switch (sortField) {
+      case "name":
+        valueA = a.name;
+        valueB = b.name;
+        break;
+      case "fatherName":
+        valueA = a.fatherName;
+        valueB = b.fatherName;
+        break;
+      case "monthlyFee":
+        valueA = a.monthlyFee;
+        valueB = b.monthlyFee;
+        break;
+      default:
+        valueA = a.name;
+        valueB = b.name;
+    }
+
+    // Compare values
+    if (valueA < valueB) return sortDirection === "asc" ? -1 : 1;
+    if (valueA > valueB) return sortDirection === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  // Filter students based on search term, group, teacher, and status
+  const filteredStudents = sortedStudents.filter((student) => {
     const matchesSearchTerm =
       student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.fatherName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.whatsappNumber.includes(searchTerm);
+      (student.parentPhone1 && student.parentPhone1.includes(searchTerm)) ||
+      (student.parentPhone2 && student.parentPhone2.includes(searchTerm));
     
     const matchesGroup = filterGroup ? student.group === filterGroup : true;
     
-    return matchesSearchTerm && matchesGroup;
+    const matchesTeacher = filterTeacher ? student.assignedTeacherId === filterTeacher : true;
+    
+    const matchesStatus = 
+      filterStatus === "active" ? student.active === true && student.resigned !== true :
+      filterStatus === "inactive" ? student.active === false :
+      filterStatus === "resigned" ? student.resigned === true :
+      true;
+    
+    return matchesSearchTerm && matchesGroup && matchesTeacher && matchesStatus;
   });
 
   // Get unique groups for filter dropdown
   const uniqueGroups = [...new Set(students.map(student => student.group))];
 
+  // Find teacher name by ID
+  const getTeacherName = (teacherId: string) => {
+    const teacher = teachers.find(t => t.id === teacherId);
+    return teacher ? teacher.name : "অনির্দিষ্ট";
+  };
+
   return (
     <div className="space-y-6 page-transition">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-2xl font-semibold tracking-tight">ছাত্র ব্যবস্থাপনা</h2>
-        <Button onClick={() => setIsAddDialogOpen(true)} className="btn-primary">
-          <Plus className="mr-2 h-4 w-4" /> নতুন ছাত্র যোগ করুন
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => setIsAddDialogOpen(true)} className="btn-primary">
+            <Plus className="mr-2 h-4 w-4" /> নতুন ছাত্র যোগ করুন
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -250,29 +415,57 @@ const Students = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <div className="w-full sm:w-48">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 w-full sm:w-auto">
               <Select value={filterGroup} onValueChange={setFilterGroup}>
                 <SelectTrigger>
                   <Filter className="mr-2 h-4 w-4" />
-                  <SelectValue placeholder="গ্রুপ বাছাই করুন" />
+                  <SelectValue placeholder="গ্রুপ" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">সকল গ্রুপ</SelectItem>
                   {uniqueGroups.map((group) => (
                     <SelectItem key={group} value={group}>
                       {group === "hifz" ? "হিফজ" : 
-                       group === "qaida" ? "কায়দা" : 
-                       group === "nazera" ? "নাযেরা" : 
-                       group === "sifara" ? "সিফারা" : group}
+                      group === "qaida" ? "কায়দা" : 
+                      group === "nazera" ? "নাযেরা" : 
+                      group === "sifara" ? "সিফারা" : group}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={filterTeacher} onValueChange={setFilterTeacher}>
+                <SelectTrigger>
+                  <User className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="শিক্ষক" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">সকল শিক্ষক</SelectItem>
+                  {availableTeachers.map((teacher) => (
+                    <SelectItem key={teacher.id} value={teacher.id}>
+                      {teacher.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger>
+                  <Filter className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="স্টেটাস" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">সকল স্টেটাস</SelectItem>
+                  <SelectItem value="active">সক্রিয়</SelectItem>
+                  <SelectItem value="inactive">নিষ্ক্রিয়</SelectItem>
+                  <SelectItem value="resigned">অবসরপ্রাপ্ত</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {isLoadingStudents || isLoadingTeachers ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
             </div>
@@ -285,11 +478,27 @@ const Students = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>নাম</TableHead>
-                    <TableHead>বাবার নাম</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("name")}>
+                      নাম
+                      {sortField === "name" && (
+                        <ArrowUpDown className={`ml-2 h-4 w-4 inline ${sortDirection === "desc" ? "rotate-180" : ""}`} />
+                      )}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("fatherName")}>
+                      বাবার নাম
+                      {sortField === "fatherName" && (
+                        <ArrowUpDown className={`ml-2 h-4 w-4 inline ${sortDirection === "desc" ? "rotate-180" : ""}`} />
+                      )}
+                    </TableHead>
+                    <TableHead>ফোন নম্বর</TableHead>
+                    <TableHead>শিক্ষক</TableHead>
                     <TableHead>গ্রুপ</TableHead>
-                    <TableHead>যোগাযোগ</TableHead>
-                    <TableHead>মাসিক ফি</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("monthlyFee")}>
+                      মাসিক ফি
+                      {sortField === "monthlyFee" && (
+                        <ArrowUpDown className={`ml-2 h-4 w-4 inline ${sortDirection === "desc" ? "rotate-180" : ""}`} />
+                      )}
+                    </TableHead>
                     <TableHead>স্ট্যাটাস</TableHead>
                     <TableHead className="text-right">অ্যাকশন</TableHead>
                   </TableRow>
@@ -299,38 +508,56 @@ const Students = () => {
                     <TableRow key={student.id}>
                       <TableCell className="font-medium">{student.name}</TableCell>
                       <TableCell>{student.fatherName}</TableCell>
+                      <TableCell>{student.parentPhone1}</TableCell>
+                      <TableCell>{getTeacherName(student.assignedTeacherId)}</TableCell>
                       <TableCell>
                         {student.group === "hifz" ? "হিফজ" : 
                         student.group === "qaida" ? "কায়দা" : 
                         student.group === "nazera" ? "নাযেরা" : 
                         student.group === "sifara" ? "সিফারা" : student.group}
                       </TableCell>
-                      <TableCell>{student.whatsappNumber}</TableCell>
                       <TableCell>৳{toBengaliNumber(student.monthlyFee)}</TableCell>
                       <TableCell>
                         <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          student.active
+                          student.resigned
+                            ? "bg-yellow-100 text-yellow-800"
+                            : student.active
                             ? "bg-green-100 text-green-800"
                             : "bg-red-100 text-red-800"
                         }`}>
-                          {student.active ? "সক্রিয়" : "নিষ্ক্রিয়"}
+                          {student.resigned ? "অবসরপ্রাপ্ত" : student.active ? "সক্রিয়" : "নিষ্ক্রিয়"}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(student)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(student)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <TableCell className="text-right space-x-1">
+                        {isAdmin && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(student)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            
+                            {!student.resigned && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleResign(student)}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
+                            
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(student)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -343,7 +570,7 @@ const Students = () => {
 
       {/* Add Student Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>নতুন ছাত্র যোগ করুন</DialogTitle>
             <DialogDescription>
@@ -354,7 +581,7 @@ const Students = () => {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">ছাত্রের নাম</Label>
+                  <Label htmlFor="name">ছাত্রের নাম*</Label>
                   <Input
                     id="name"
                     name="name"
@@ -375,7 +602,7 @@ const Students = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="fatherName">বাবার নাম</Label>
+                  <Label htmlFor="fatherName">বাবার নাম*</Label>
                   <Input
                     id="fatherName"
                     name="fatherName"
@@ -385,7 +612,7 @@ const Students = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="motherName">মায়ের নাম</Label>
+                  <Label htmlFor="motherName">মায়ের নাম*</Label>
                   <Input
                     id="motherName"
                     name="motherName"
@@ -397,33 +624,30 @@ const Students = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="whatsappNumber">হোয়াটসঅ্যাপ নম্বর</Label>
-                  <Input
-                    id="whatsappNumber"
-                    name="whatsappNumber"
-                    value={formData.whatsappNumber}
-                    onChange={handleChange}
+                  <Label htmlFor="parentPhone1">অভিভাবকের প্রথম ফোন নম্বর* (দেশের কোড সহ, + ছাড়া)</Label>
+                  <PhoneInput
+                    value={formData.parentPhone1 || ""}
+                    onChange={(value) => handlePhoneChange("parentPhone1", value)}
+                    placeholder="88017xxxxxxxx"
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="guardianPhone">অভিভাবকের ফোন নম্বর</Label>
-                  <Input
-                    id="guardianPhone"
-                    name="guardianPhone"
-                    value={formData.guardianPhone || ""}
-                    onChange={handleChange}
+                  <Label htmlFor="parentPhone2">অভিভাবকের দ্বিতীয় ফোন নম্বর (দেশের কোড সহ, + ছাড়া)</Label>
+                  <PhoneInput
+                    value={formData.parentPhone2 || ""}
+                    onChange={(value) => handlePhoneChange("parentPhone2", value)}
+                    placeholder="88017xxxxxxxx"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="emergencyContact">জরুরী যোগাযোগ</Label>
-                  <Input
-                    id="emergencyContact"
-                    name="emergencyContact"
-                    value={formData.emergencyContact || ""}
-                    onChange={handleChange}
+                  <Label htmlFor="whatsappNumber">হোয়াটসঅ্যাপ নম্বর (যদি থাকে)</Label>
+                  <PhoneInput
+                    value={formData.whatsappNumber || ""}
+                    onChange={(value) => handlePhoneChange("whatsappNumber", value)}
+                    placeholder="88017xxxxxxxx"
                   />
                 </div>
                 <div className="space-y-2">
@@ -442,17 +666,16 @@ const Students = () => {
                 <Input
                   id="address"
                   name="address"
-                  value={formData.address}
+                  value={formData.address || ""}
                   onChange={handleChange}
-                  required
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="group">গ্রুপ</Label>
+                  <Label htmlFor="group">গ্রুপ*</Label>
                   <Select
                     value={formData.group}
-                    onValueChange={handleSelectChange}
+                    onValueChange={(value) => handleSelectChange("group", value)}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -466,7 +689,7 @@ const Students = () => {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="monthlyFee">মাসিক ফি (৳)</Label>
+                  <Label htmlFor="monthlyFee">মাসিক ফি (৳)*</Label>
                   <Input
                     id="monthlyFee"
                     name="monthlyFee"
@@ -476,6 +699,24 @@ const Students = () => {
                     required
                   />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assignedTeacherId">নির্ধারিত শিক্ষক*</Label>
+                <Select
+                  value={formData.assignedTeacherId}
+                  onValueChange={(value) => handleSelectChange("assignedTeacherId", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="একজন শিক্ষক নির্বাচন করুন" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableTeachers.map((teacher) => (
+                      <SelectItem key={teacher.id} value={teacher.id}>
+                        {teacher.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="previousEducation">আগের শিক্ষা (যদি থাকে)</Label>
@@ -499,7 +740,7 @@ const Students = () => {
                 <Checkbox
                   id="active"
                   checked={formData.active}
-                  onCheckedChange={handleCheckboxChange}
+                  onCheckedChange={(checked) => handleCheckboxChange("active", checked === true)}
                 />
                 <label
                   htmlFor="active"
@@ -530,7 +771,7 @@ const Students = () => {
 
       {/* Edit Student Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>ছাত্রের তথ্য সম্পাদনা করুন</DialogTitle>
             <DialogDescription>
@@ -541,7 +782,7 @@ const Students = () => {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">ছাত্রের নাম</Label>
+                  <Label htmlFor="name">ছাত্রের নাম*</Label>
                   <Input
                     id="name"
                     name="name"
@@ -562,7 +803,7 @@ const Students = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="fatherName">বাবার নাম</Label>
+                  <Label htmlFor="fatherName">বাবার নাম*</Label>
                   <Input
                     id="fatherName"
                     name="fatherName"
@@ -572,7 +813,7 @@ const Students = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="motherName">মায়ের নাম</Label>
+                  <Label htmlFor="motherName">মায়ের নাম*</Label>
                   <Input
                     id="motherName"
                     name="motherName"
@@ -584,33 +825,30 @@ const Students = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="whatsappNumber">হোয়াটসঅ্যাপ নম্বর</Label>
-                  <Input
-                    id="whatsappNumber"
-                    name="whatsappNumber"
-                    value={formData.whatsappNumber}
-                    onChange={handleChange}
+                  <Label htmlFor="parentPhone1">অভিভাবকের প্রথম ফোন নম্বর* (দেশের কোড সহ, + ছাড়া)</Label>
+                  <PhoneInput
+                    value={formData.parentPhone1 || ""}
+                    onChange={(value) => handlePhoneChange("parentPhone1", value)}
+                    placeholder="88017xxxxxxxx"
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="guardianPhone">অভিভাবকের ফোন নম্বর</Label>
-                  <Input
-                    id="guardianPhone"
-                    name="guardianPhone"
-                    value={formData.guardianPhone || ""}
-                    onChange={handleChange}
+                  <Label htmlFor="parentPhone2">অভিভাবকের দ্বিতীয় ফোন নম্বর (দেশের কোড সহ, + ছাড়া)</Label>
+                  <PhoneInput
+                    value={formData.parentPhone2 || ""}
+                    onChange={(value) => handlePhoneChange("parentPhone2", value)}
+                    placeholder="88017xxxxxxxx"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="emergencyContact">জরুরী যোগাযোগ</Label>
-                  <Input
-                    id="emergencyContact"
-                    name="emergencyContact"
-                    value={formData.emergencyContact || ""}
-                    onChange={handleChange}
+                  <Label htmlFor="whatsappNumber">হোয়াটসঅ্যাপ নম্বর (যদি থাকে)</Label>
+                  <PhoneInput
+                    value={formData.whatsappNumber || ""}
+                    onChange={(value) => handlePhoneChange("whatsappNumber", value)}
+                    placeholder="88017xxxxxxxx"
                   />
                 </div>
                 <div className="space-y-2">
@@ -629,17 +867,16 @@ const Students = () => {
                 <Input
                   id="address"
                   name="address"
-                  value={formData.address}
+                  value={formData.address || ""}
                   onChange={handleChange}
-                  required
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="group">গ্রুপ</Label>
+                  <Label htmlFor="group">গ্রুপ*</Label>
                   <Select
                     value={formData.group}
-                    onValueChange={handleSelectChange}
+                    onValueChange={(value) => handleSelectChange("group", value)}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -653,7 +890,7 @@ const Students = () => {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="monthlyFee">মাসিক ফি (৳)</Label>
+                  <Label htmlFor="monthlyFee">মাসিক ফি (৳)*</Label>
                   <Input
                     id="monthlyFee"
                     name="monthlyFee"
@@ -663,6 +900,24 @@ const Students = () => {
                     required
                   />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assignedTeacherId">নির্ধারিত শিক্ষক*</Label>
+                <Select
+                  value={formData.assignedTeacherId}
+                  onValueChange={(value) => handleSelectChange("assignedTeacherId", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="একজন শিক্ষক নির্বাচন করুন" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableTeachers.map((teacher) => (
+                      <SelectItem key={teacher.id} value={teacher.id}>
+                        {teacher.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="previousEducation">আগের শিক্ষা (যদি থাকে)</Label>
@@ -686,7 +941,7 @@ const Students = () => {
                 <Checkbox
                   id="active"
                   checked={formData.active}
-                  onCheckedChange={handleCheckboxChange}
+                  onCheckedChange={(checked) => handleCheckboxChange("active", checked === true)}
                 />
                 <label
                   htmlFor="active"
@@ -695,6 +950,17 @@ const Students = () => {
                   সক্রিয় ছাত্র
                 </label>
               </div>
+              {formData.resigned && (
+                <div className="rounded-md bg-yellow-50 p-4">
+                  <div className="flex">
+                    <div className="text-yellow-800">
+                      <p className="text-sm font-medium">
+                        এই ছাত্র অবসরপ্রাপ্ত হিসেবে চিহ্নিত করা হয়েছে {formData.resignDate ? `(${formData.resignDate})` : ''}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button
@@ -715,35 +981,54 @@ const Students = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Resign Student Dialog */}
+      <AlertDialog open={isResignDialogOpen} onOpenChange={setIsResignDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ছাত্রকে অবসর দেওয়ার নিশ্চিতকরণ</AlertDialogTitle>
+            <AlertDialogDescription>
+              আপনি কি নিশ্চিত যে আপনি {currentStudent?.name} কে অবসর দিতে চান?
+              এই ছাত্র অবসরপ্রাপ্ত হিসেবে চিহ্নিত করা হবে এবং ভবিষ্যতে সক্রিয় হিসেবে গণ্য করা হবে না।
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setIsResignDialogOpen(false)}>
+              বাতিল
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleResignConfirm}
+              disabled={updateStudentMutation.isPending}
+            >
+              {updateStudentMutation.isPending ? "প্রক্রিয়াধীন..." : "নিশ্চিত করুন"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>ছাত্র মুছে ফেলার নিশ্চিতকরণ</DialogTitle>
-            <DialogDescription>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>ছাত্র মুছে ফেলার নিশ্চিতকরণ</AlertDialogTitle>
+            <AlertDialogDescription>
               আপনি কি নিশ্চিত যে আপনি {currentStudent?.name} কে মুছে ফেলতে চান?
               এই ক্রিয়া অপরিবর্তনীয়।
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsDeleteDialogOpen(false)}
-            >
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setIsDeleteDialogOpen(false)}>
               বাতিল
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
+            </AlertDialogCancel>
+            <AlertDialogAction
               onClick={() => currentStudent?.id && deleteStudentMutation.mutate(currentStudent.id)}
               disabled={deleteStudentMutation.isPending}
+              className="bg-red-600 hover:bg-red-700"
             >
               {deleteStudentMutation.isPending ? "মুছে ফেলা হচ্ছে..." : "মুছে ফেলুন"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
