@@ -67,9 +67,9 @@ const Students = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isResignDialogOpen, setIsResignDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterGroup, setFilterGroup] = useState("");
-  const [filterTeacher, setFilterTeacher] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
+  const [filterGroup, setFilterGroup] = useState("all");
+  const [filterTeacher, setFilterTeacher] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
   const [sortField, setSortField] = useState("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
@@ -368,9 +368,9 @@ const Students = () => {
       (student.parentPhone1 && student.parentPhone1.includes(searchTerm)) ||
       (student.parentPhone2 && student.parentPhone2.includes(searchTerm));
     
-    const matchesGroup = filterGroup ? student.group === filterGroup : true;
+    const matchesGroup = filterGroup === "all" ? true : student.group === filterGroup;
     
-    const matchesTeacher = filterTeacher ? student.assignedTeacherId === filterTeacher : true;
+    const matchesTeacher = filterTeacher === "all" ? true : student.assignedTeacherId === filterTeacher;
     
     const matchesStatus = 
       filterStatus === "active" ? student.active === true && student.resigned !== true :
@@ -422,7 +422,7 @@ const Students = () => {
                   <SelectValue placeholder="গ্রুপ" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">সকল গ্রুপ</SelectItem>
+                  <SelectItem value="all">সকল গ্রুপ</SelectItem>
                   {uniqueGroups.map((group) => (
                     <SelectItem key={group} value={group}>
                       {group === "hifz" ? "হিফজ" : 
@@ -440,7 +440,7 @@ const Students = () => {
                   <SelectValue placeholder="শিক্ষক" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">সকল শিক্ষক</SelectItem>
+                  <SelectItem value="all">সকল শিক্ষক</SelectItem>
                   {availableTeachers.map((teacher) => (
                     <SelectItem key={teacher.id} value={teacher.id}>
                       {teacher.name}
@@ -455,7 +455,7 @@ const Students = () => {
                   <SelectValue placeholder="স্টেটাস" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">সকল স্টেটাস</SelectItem>
+                  <SelectItem value="all">সকল স্টেটাস</SelectItem>
                   <SelectItem value="active">সক্রিয়</SelectItem>
                   <SelectItem value="inactive">নিষ্ক্রিয়</SelectItem>
                   <SelectItem value="resigned">অবসরপ্রাপ্ত</SelectItem>
