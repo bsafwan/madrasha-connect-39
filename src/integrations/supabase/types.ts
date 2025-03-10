@@ -634,6 +634,7 @@ export type Database = {
         Row: {
           active: boolean
           address: string
+          assigned_teacher_id: string | null
           birth_date: string | null
           emergency_contact: string | null
           enrollment_number: string | null
@@ -645,14 +646,19 @@ export type Database = {
           monthly_fee: number
           mother_name: string
           name: string
+          parent_phone1: string | null
+          parent_phone2: string | null
           previous_education: string | null
           registration_date: string
+          resign_date: string | null
+          resigned: boolean | null
           updated_at: string
           whatsapp_number: string
         }
         Insert: {
           active?: boolean
           address: string
+          assigned_teacher_id?: string | null
           birth_date?: string | null
           emergency_contact?: string | null
           enrollment_number?: string | null
@@ -664,14 +670,19 @@ export type Database = {
           monthly_fee: number
           mother_name: string
           name: string
+          parent_phone1?: string | null
+          parent_phone2?: string | null
           previous_education?: string | null
           registration_date?: string
+          resign_date?: string | null
+          resigned?: boolean | null
           updated_at?: string
           whatsapp_number: string
         }
         Update: {
           active?: boolean
           address?: string
+          assigned_teacher_id?: string | null
           birth_date?: string | null
           emergency_contact?: string | null
           enrollment_number?: string | null
@@ -683,12 +694,24 @@ export type Database = {
           monthly_fee?: number
           mother_name?: string
           name?: string
+          parent_phone1?: string | null
+          parent_phone2?: string | null
           previous_education?: string | null
           registration_date?: string
+          resign_date?: string | null
+          resigned?: boolean | null
           updated_at?: string
           whatsapp_number?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "students_assigned_teacher_id_fkey"
+            columns: ["assigned_teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       study_materials: {
         Row: {

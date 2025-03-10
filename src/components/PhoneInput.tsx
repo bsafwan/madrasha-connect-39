@@ -1,4 +1,3 @@
-
 import React, { useState, ChangeEvent } from "react";
 import { Input } from "@/components/ui/input";
 
@@ -33,16 +32,26 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
       setError("নম্বরটি খুব ছোট");
     } else if (digitsOnly.length > 15) {
       setError("নম্বরটি খুব বড়");
+    } else if (digitsOnly.length > 0 && !/^\d+$/.test(digitsOnly)) {
+      setError("শুধুমাত্র সংখ্যা ব্যবহার করুন");
     } else {
       setError(null);
     }
+  };
+
+  // Format the display value for readability (optional)
+  const formatDisplayValue = (value: string): string => {
+    if (!value) return "";
+    
+    // Simple formatting: keep it as digits only
+    return value;
   };
 
   return (
     <div className="space-y-1">
       <Input
         type="tel"
-        value={value}
+        value={formatDisplayValue(value)}
         onChange={handleChange}
         placeholder={placeholder}
         required={required}
